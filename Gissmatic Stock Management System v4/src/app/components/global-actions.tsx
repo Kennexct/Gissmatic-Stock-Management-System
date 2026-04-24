@@ -355,22 +355,7 @@ export function GlobalActionsProvider({ children }: { children: React.ReactNode 
     setReleaseAction(null);
   };
 
-  const handleAddCategory = () => {
-    if (!newCategory.trim()) { toast.error("Enter a category name"); return; }
-    addCategory(newCategory.trim());
-    setNewProdForm((p) => ({ ...p, category: newCategory.trim() }));
-    toast.success(`Category "${newCategory.trim()}" added`);
-    setNewCategory(""); setIsAddCategoryOpen(false);
-  };
 
-  const handleAddSupplier = () => {
-    if (!newSupplier.name || !newSupplier.phone || !newSupplier.email) { toast.error("Name, phone and email required"); return; }
-    addSupplier(newSupplier);
-    setNewProdForm((p) => ({ ...p, supplierName: newSupplier.name }));
-    toast.success(`Supplier "${newSupplier.name}" added`);
-    setNewSupplier({ name: "", phone: "", email: "", address: "", country: "" });
-    setIsAddSupplierOpen(false);
-  };
 
   const handleAddCustomer = () => {
     if (!newCustomer.name || !newCustomer.email || !newCustomer.phone) { toast.error("Name, email and phone required"); return; }
