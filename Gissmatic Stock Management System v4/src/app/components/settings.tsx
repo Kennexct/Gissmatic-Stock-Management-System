@@ -91,11 +91,12 @@ function PermissionToggle({ value, onChange }: { value: boolean; onChange: (v: b
   );
 }
 
-function StaffPermissionsPanel({ user, permissions, onUpdate, onDelete }: {
+function StaffPermissionsPanel({ user, permissions, onUpdate, onDelete, confirmAction }: {
   user: UserType;
   permissions: UserPermissions;
   onUpdate: (updates: Partial<UserPermissions>) => void;
   onDelete?: () => void;
+  confirmAction?: (title: string, desc: string, actionName: string, onConfirm: () => void) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
 
@@ -143,7 +144,16 @@ function StaffPermissionsPanel({ user, permissions, onUpdate, onDelete }: {
                         <input
                           type="checkbox"
                           checked={val}
-                          onChange={(e) => onUpdate({ [item.key]: e.target.checked } as Partial<UserPermissions>)}
+                          onChange={(e) => {
+                            const checked = e.target.checked;
+                            if (confirmAction) {
+                              confirmAction("Update Permission", `Are you sure you want to ${checked ? "grant" : "revoke"} access for "${item.label}"?`, "Confirm", () => {
+                                onUpdate({ [item.key]: checked } as Partial<UserPermissions>);
+                              });
+                            } else {
+                              onUpdate({ [item.key]: checked } as Partial<UserPermissions>);
+                            }
+                          }}
                           className="mt-0.5 w-4 h-4 rounded border-slate-300 text-[#0a1565] focus:ring-[#0a1565] cursor-pointer"
                         />
                         <div className="min-w-0 -mt-0.5">
@@ -161,10 +171,14 @@ function StaffPermissionsPanel({ user, permissions, onUpdate, onDelete }: {
           <div className="flex flex-wrap gap-2 pt-4 border-t border-slate-200">
             <button
               onClick={() => {
-                const updates: Partial<UserPermissions> = {};
-                PERMISSION_GROUPS.flatMap((g) => g.items).forEach((item) => updates[item.key as keyof UserPermissions] = true);
-                onUpdate(updates);
-                toast.success(`All permissions enabled for ${user.name}`);
+                if (confirmAction) {
+                  confirmAction("Enable All", `Are you sure you want to grant all permissions to ${user.name}?`, "Enable All", () => {
+                    const updates: Partial<UserPermissions> = {};
+                    PERMISSION_GROUPS.flatMap((g) => g.items).forEach((item) => updates[item.key as keyof UserPermissions] = true);
+                    onUpdate(updates);
+                    toast.success(`All permissions enabled for ${user.name}`);
+                  });
+                }
               }}
               className="text-xs px-3 py-1.5 rounded-lg font-medium transition-colors"
               style={{ background: "#f0fff4", color: "#0d6604", border: "1px solid #bbf7d0" }}
@@ -173,10 +187,14 @@ function StaffPermissionsPanel({ user, permissions, onUpdate, onDelete }: {
             </button>
             <button
               onClick={() => {
-                const updates: Partial<UserPermissions> = {};
-                PERMISSION_GROUPS.flatMap((g) => g.items).forEach((item) => updates[item.key as keyof UserPermissions] = false);
-                onUpdate(updates);
-                toast.success(`All permissions disabled for ${user.name}`);
+                if (confirmAction) {
+                  confirmAction("Disable All", `Are you sure you want to safely revoke all permissions from ${user.name}?`, "Disable All", () => {
+                    const updates: Partial<UserPermissions> = {};
+                    PERMISSION_GROUPS.flatMap((g) => g.items).forEach((item) => updates[item.key as keyof UserPermissions] = false);
+                    onUpdate(updates);
+                    toast.success(`All permissions disabled for ${user.name}`);
+                  });
+                }
               }}
               className="text-xs px-3 py-1.5 rounded-lg font-medium transition-colors bg-red-50 text-red-600 border border-red-100"
             >
@@ -201,6 +219,14 @@ export function Settings() {
   const [userToDelete, setUserToDelete] = useState<UserType | null>(null);
   const [staffForm, setStaffForm] = useState({ name: "", email: "", role: "viewer" as UserRole });
   const [isCreating, setIsCreating] = useState(false);
+
+  const [confirmConfig, setConfirmConfig] = useState<{
+    isOpen: boolean; title: string; desc: string; action: string; onConfirm: () => void;
+  } | null>(null);
+
+  const requestConfirm = (title: string, desc: string, action: string, onConfirm: () => void) => {
+    setConfirmConfig({ isOpen: true, title, desc, action, onConfirm });
+  };
 
   // Profile Form State
   const [profileName, setProfileName] = useState(currentUser?.name || "");
@@ -356,7 +382,7 @@ export function Settings() {
                 disabled={isSavingProfile}
                 className="rounded-xl text-white"
                 style={{ background: "linear-gradient(135deg, #0a1565, #1229b3)" }}
-                onClick={handleUpdateProfile}
+                onClick={() => requestConfirm("Update Profile", "Are you sure you want to permanently save changes to your profile name and email address?", "Save Profile", handleUpdateProfile)}
               >
                 {isSavingProfile ? "Saving..." : "Save Changes"}
               </Button>
@@ -389,7 +415,7 @@ export function Settings() {
                   <Input id="confirm-pass" type="password" value={confirmPass} onChange={(e) => setConfirmPass(e.target.value)} placeholder="••••••••" className="rounded-xl" />
                 </div>
               </div>
-              <Button disabled={isSavingPass} variant="outline" className="rounded-xl" onClick={handleUpdatePassword}>
+              <Button disabled={isSavingPass} variant="outline" className="rounded-xl" onClick={() => requestConfirm("Update Password", "Are you sure you want to change your password? Doing so might require you to login again.", "Change Password", handleUpdatePassword)}>
                 {isSavingPass ? "Updating..." : "Update Password"}
               </Button>
             </CardContent>
@@ -421,7 +447,14 @@ export function Settings() {
                     <p className="font-medium text-slate-900 text-sm">{item.label}</p>
                     <p className="text-xs text-slate-400 mt-0.5 hidden sm:block">{item.desc}</p>
                   </div>
-                  <PermissionToggle value={item.val} onChange={(v) => { item.set(v); toast.success(`${item.label} ${v ? "enabled" : "disabled"}`); }} />
+                  <PermissionToggle value={item.val} onChange={(v) => { 
+                    requestConfirm(
+                      `${v ? "Enable" : "Disable"} Notification`,
+                      `Are you sure you want to ${v ? "enable" : "disable"} ${item.label.toLowerCase()}?`,
+                      "Confirm",
+                      () => { item.set(v); toast.success(`${item.label} ${v ? "enabled" : "disabled"}`); }
+                    );
+                  }} />
                 </div>
               ))}
             </CardContent>
@@ -501,6 +534,7 @@ export function Settings() {
                           }
                         }}
                         onDelete={() => setUserToDelete(user)}
+                        confirmAction={requestConfirm}
                       />
                     </div>
                   );
@@ -563,6 +597,27 @@ export function Settings() {
           <DialogFooter>
             <Button variant="outline" className="rounded-xl" onClick={() => setUserToDelete(null)}>Cancel</Button>
             <Button variant="destructive" className="rounded-xl" onClick={handleDeleteUser}>Remove</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      
+      {/* Universal Action Confirm */}
+      <Dialog open={!!confirmConfig?.isOpen} onOpenChange={(open) => !open && setConfirmConfig(null)}>
+        <DialogContent className="max-w-sm rounded-2xl">
+          <DialogHeader>
+            <DialogTitle>{confirmConfig?.title}</DialogTitle>
+            <DialogDescription>{confirmConfig?.desc}</DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" className="rounded-xl" onClick={() => setConfirmConfig(null)}>Cancel</Button>
+            <Button className="rounded-xl text-white" style={{ background: "linear-gradient(135deg, #0a1565, #1229b3)" }} onClick={() => {
+              if (confirmConfig) {
+                confirmConfig.onConfirm();
+                setConfirmConfig(null);
+              }
+            }}>
+              {confirmConfig?.action}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
