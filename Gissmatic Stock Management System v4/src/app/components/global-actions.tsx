@@ -660,42 +660,6 @@ export function GlobalActionsProvider({ children }: { children: React.ReactNode 
         </DialogContent>
       </Dialog>
 
-      {/* Add Category dialog */}
-      <Dialog open={isAddCategoryOpen} onOpenChange={setIsAddCategoryOpen}>
-        <DialogContent className="max-w-sm rounded-2xl">
-          <DialogHeader><DialogTitle>New Category</DialogTitle></DialogHeader>
-          <Input placeholder="e.g. Electronics" value={newCategory} onChange={(e) => setNewCategory(e.target.value)} className="rounded-xl" />
-          <DialogFooter>
-            <Button variant="outline" className="rounded-xl" onClick={() => setIsAddCategoryOpen(false)}>Cancel</Button>
-            <Button className="rounded-xl text-white" style={{ background: "linear-gradient(135deg, #0a1565, #1229b3)" }} onClick={handleAddCategory}>Add</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Add Supplier dialog */}
-      <Dialog open={isAddSupplierOpen} onOpenChange={setIsAddSupplierOpen}>
-        <DialogContent className="max-w-sm rounded-2xl">
-          <DialogHeader><DialogTitle>Add New Supplier</DialogTitle></DialogHeader>
-          <div className="space-y-3 py-2">
-            {[
-              { id: "ns-n", l: "Name *", k: "name", p: "ABC Distributors" },
-              { id: "ns-ph", l: "Phone *", k: "phone", p: "+1-555-0123" },
-              { id: "ns-em", l: "Email *", k: "email", p: "contact@supplier.com" },
-              { id: "ns-ad", l: "Address", k: "address", p: "Street, City" },
-              { id: "ns-co", l: "Country", k: "country", p: "United States" },
-            ].map((f) => (
-              <div key={f.id} className="space-y-1.5">
-                <Label htmlFor={f.id}>{f.l}</Label>
-                <Input id={f.id} placeholder={f.p} value={(newSupplier as any)[f.k]} onChange={(e) => setNewSupplier({ ...newSupplier, [f.k]: e.target.value })} className="rounded-xl" />
-              </div>
-            ))}
-          </div>
-          <DialogFooter>
-            <Button variant="outline" className="rounded-xl" onClick={() => setIsAddSupplierOpen(false)}>Cancel</Button>
-            <Button className="rounded-xl text-white" style={{ background: "linear-gradient(135deg, #0a1565, #1229b3)" }} onClick={handleAddSupplier}>Add Supplier</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
 
       {/* Confirm Add Stock */}
       <ConfirmDialog
