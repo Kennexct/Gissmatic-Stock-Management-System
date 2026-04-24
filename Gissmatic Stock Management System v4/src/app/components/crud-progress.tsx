@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, createContext, useContext, useRef } from "react";
-import { motion, AnimatePresence } from "motion";
+import { motion, AnimatePresence } from "motion/react";
 
 // ─── Types ─────────────────────────────────────────────────────────
 type CrudAction = "create" | "update" | "delete" | "sync" | "freeze" | "release" | "stock-in" | "stock-out";
