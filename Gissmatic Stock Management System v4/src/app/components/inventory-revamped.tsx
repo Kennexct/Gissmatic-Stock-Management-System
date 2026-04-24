@@ -26,6 +26,7 @@ function AddNewProductModal({ onClose }: { onClose: () => void }) {
   const [addSnInput, setAddSnInput] = useState("");
   const [addSnList, setAddSnList] = useState<string[]>([]);
   const [addQty, setAddQty] = useState("");
+  const [isCustomCategory, setIsCustomCategory] = useState(false);
 
   const handleAddSn = () => {
     const sn = addSnInput.trim();
@@ -78,11 +79,24 @@ function AddNewProductModal({ onClose }: { onClose: () => void }) {
             <Input placeholder="Enter product name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="rounded-xl" />
           </div>
           <div className="space-y-1.5">
-            <Label>Category *</Label>
-            <Select value={form.category} onValueChange={(v) => setForm({ ...form, category: v })}>
-              <SelectTrigger className="rounded-xl"><SelectValue placeholder="Select a category" /></SelectTrigger>
-              <SelectContent>{categories.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
-            </Select>
+            <div className="flex justify-between items-center">
+              <Label>Category *</Label>
+              <button 
+                type="button" 
+                onClick={() => { setIsCustomCategory(!isCustomCategory); setForm({...form, category: ""}); }} 
+                className="text-xs font-semibold text-[#0a1565] hover:underline"
+              >
+                {isCustomCategory ? "Pick Existing" : "+ New Category"}
+              </button>
+            </div>
+            {isCustomCategory ? (
+              <Input placeholder="Type new category..." value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} className="rounded-xl" autoFocus />
+            ) : (
+              <Select value={form.category} onValueChange={(v) => setForm({ ...form, category: v })}>
+                <SelectTrigger className="rounded-xl"><SelectValue placeholder="Select a category" /></SelectTrigger>
+                <SelectContent>{categories.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
+              </Select>
+            )}
           </div>
           <div className="space-y-1.5">
             <Label>Supplier</Label>

@@ -86,6 +86,40 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setPermissions(storedPermissions ? JSON.parse(storedPermissions) : mockPermissions);
     setCategories(storedCategories ? JSON.parse(storedCategories) : defaultCategories);
     setCurrencyState(storedCurrency || "USD");
+
+    // Fetch Products from Supabase on Mount
+    const fetchSupabaseProducts = async () => {
+      const { data, error } = await supabase.from('products').select('*');
+      if (error) {
+        console.error("Failed to fetch products from Supabase:", error);
+      } else if (data && data.length > 0) {
+        const mappedProducts: Product[] = data.map((db: any) => ({
+          id: db.id,
+          partNumber: db.part_number,
+          name: db.name,
+          description: db.description,
+          imageUrl: db.image_url,
+          category: db.category,
+          trackingType: db.tracking_type,
+          quantity: db.quantity,
+          serialNumbers: db.serial_numbers || [],
+          supplierName: db.supplier_name,
+          lastUpdated: db.last_updated || db.created_at || new Date().toISOString(),
+        }));
+        
+        // Sort by newest first matching local sorting convention
+        mappedProducts.sort((a, b) => new Date(b.lastUpdated).getTime() - new Date(a.lastUpdated).getTime());
+        setProducts(mappedProducts);
+
+        // Extract unique categories so custom categories added by users show up
+        const dbCategories = Array.from(new Set(mappedProducts.map(p => p.category).filter(Boolean)));
+        setCategories(prev => {
+           const merged = [...new Set([...prev, ...dbCategories])];
+           return merged;
+        });
+      }
+    };
+    fetchSupabaseProducts();
   }, []);
 
   useEffect(() => {
@@ -213,13 +247,64 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setPermissions(permissions.filter((p) => p.userId !== id));
   };
 
-  const addProduct = (productData: Omit<Product, "id" | "lastUpdated">) => {
-    const newProduct: Product = { ...productData, id: `P${Date.now()}`, lastUpdated: new Date().toISOString() };
-    setProducts([...products, newProduct]);
+  const addProduct = async (productData: Omit<Product, "id" | "lastUpdated">) => {
+    // 1. Optimistic Local Update
+    const tempId = `P${Date.now()}`;
+    const newProduct: Product = { ...productData, id: tempId, lastUpdated: new Date().toISOString() };
+    setProducts(prev => [newProduct, ...prev]);
+
+    // 2. Add to Custom Categories list instantly
+    if (productData.category && !categories.includes(productData.category)) {
+      setCategories(prev => [...prev, productData.category]);
+    }
+
+    // 3. Push to Supabase
+    const dbPayload = {
+      part_number: productData.partNumber,
+      name: productData.name,
+      description: productData.description || null,
+      image_url: productData.imageUrl || null,
+      category: productData.category,
+      tracking_type: productData.trackingType,
+      quantity: productData.quantity,
+      serial_numbers: productData.serialNumbers || [],
+      supplier_name: productData.supplierName || null,
+      last_updated: newProduct.lastUpdated
+    };
+
+    const { data, error } = await supabase.from('products').insert([dbPayload]).select().single();
+    if (error) {
+      console.error("Supabase insert error:", error);
+    } else if (data && data.id) {
+      // Replace temporary ID with actual real DB ID
+      setProducts(prev => prev.map(p => p.id === tempId ? { ...p, id: data.id } : p));
+    }
   };
 
-  const updateProduct = (id: string, updates: Partial<Product>) => {
-    setProducts(products.map((p) => p.id === id ? { ...p, ...updates, lastUpdated: new Date().toISOString() } : p));
+  const updateProduct = async (id: string, updates: Partial<Product>) => {
+    // 1. Optimistic Local Update
+    const timestamp = new Date().toISOString();
+    setProducts(prev => prev.map((p) => p.id === id ? { ...p, ...updates, lastUpdated: timestamp } : p));
+
+    // 2. Update Custom Categories list
+    if (updates.category && !categories.includes(updates.category)) {
+      setCategories(prev => [...prev, updates.category]);
+    }
+
+    // 3. Sync to Supabase
+    const dbPayload: any = { last_updated: timestamp };
+    if (updates.partNumber !== undefined) dbPayload.part_number = updates.partNumber;
+    if (updates.name !== undefined) dbPayload.name = updates.name;
+    if (updates.description !== undefined) dbPayload.description = updates.description;
+    if (updates.imageUrl !== undefined) dbPayload.image_url = updates.imageUrl;
+    if (updates.category !== undefined) dbPayload.category = updates.category;
+    if (updates.trackingType !== undefined) dbPayload.tracking_type = updates.trackingType;
+    if (updates.quantity !== undefined) dbPayload.quantity = updates.quantity;
+    if (updates.serialNumbers !== undefined) dbPayload.serial_numbers = updates.serialNumbers;
+    if (updates.supplierName !== undefined) dbPayload.supplier_name = updates.supplierName;
+
+    const { error } = await supabase.from('products').update(dbPayload).eq('id', id);
+    if (error) console.error("Supabase update product error:", error);
   };
 
   const addAuditLog = (logData: Omit<AuditLog, "id" | "timestamp">) => {
