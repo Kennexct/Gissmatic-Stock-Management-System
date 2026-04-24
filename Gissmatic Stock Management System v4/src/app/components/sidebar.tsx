@@ -6,7 +6,7 @@ import {
 import { useAuth } from "./auth-context";
 import { cn } from "../../lib/utils";
 
-const logoImage = "https://placehold.co/100x100/16c60c/ffffff?text=G&font=roboto";
+const logoImage = "/logo.png";
 
 interface SidebarProps {
   currentPage: string;

@@ -230,6 +230,9 @@ export function Settings() {
   const [notifEmail, setNotifEmail] = useState(false);
   const [notifAdjust, setNotifAdjust] = useState(true);
 
+  const [isEditingProfile, setIsEditingProfile] = useState(false);
+  const [isEditingSecurity, setIsEditingSecurity] = useState(false);
+
   const [searchQuery, setSearchQuery] = useState("");
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [userToDelete, setUserToDelete] = useState<UserType | null>(null);
@@ -393,32 +396,35 @@ export function Settings() {
         <p className="text-slate-500 text-sm mt-0.5">Manage your account, preferences, and team access</p>
       </div>
 
-      {/* Tab bar */}
-      <div className="flex gap-1 flex-wrap border-b border-slate-200">
-        {tabs.map((tab) => {
-          const Icon = tab.icon;
-          const isActive = activeTab === tab.id;
-          return (
-            <button
-              key={tab.id}
-              onClick={() => handleTabClick(tab.id)}
-              className={`flex items-center gap-2 px-3 sm:px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors whitespace-nowrap ${isActive ? "border-[#16c60c] text-[#0a1565]" : "border-transparent text-slate-500 hover:text-slate-700"}`}
-            >
-              <Icon className="w-4 h-4" />
-              <span className="hidden xs:inline sm:inline">{tab.label}</span>
-            </button>
-          );
-        })}
-      </div>
+      {/* Settings layout wrapper */}
+      <div className="flex flex-col md:flex-row gap-6">
+        
+        {/* Left vertical menu */}
+        <div className="w-full md:w-56 shrink-0 flex flex-row md:flex-col gap-1 overflow-x-auto md:overflow-visible pb-2 md:pb-0">
+          {tabs.map((tab) => {
+            const Icon = tab.icon;
+            const isActive = activeTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => handleTabClick(tab.id)}
+                className={`flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-xl transition-all whitespace-nowrap shrink-0 md:w-full text-left ${isActive ? "bg-white shadow-sm border border-slate-100 text-[#0a1565]" : "text-slate-500 hover:bg-slate-50 hover:text-slate-800"}`}
+              >
+                <Icon className={`w-4.5 h-4.5 shrink-0 ${isActive ? "text-[#16c60c]" : "text-slate-400"}`} />
+                <span>{tab.label}</span>
+              </button>
+            );
+          })}
+        </div>
 
-      {/* Tab content */}
-      <div className="space-y-5">
+        {/* Tab content area */}
+        <div className="flex-1 min-w-0 space-y-5">
 
         {/* Profile Tab */}
         {activeTab === "profile" && (
           <Card className="rounded-2xl border-slate-100 shadow-sm">
-            <CardHeader className="pb-4 flex-col sm:flex-row sm:items-start">
-              <div className="flex items-center gap-3 flex-1">
+            <CardHeader className="pb-4 flex-col sm:flex-row sm:items-start justify-between gap-4">
+              <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0" style={{ background: "#0a156515" }}>
                   <User className="h-5 w-5" style={{ color: "#0a1565" }} />
                 </div>
@@ -427,16 +433,23 @@ export function Settings() {
                   <CardDescription className="mt-0.5">Update your account details</CardDescription>
                 </div>
               </div>
+              <Button
+                variant={isEditingProfile ? "default" : "outline"}
+                className={`rounded-xl h-9 px-4 text-sm ${isEditingProfile ? "bg-slate-100 text-slate-800 hover:bg-slate-200" : ""}`}
+                onClick={() => setIsEditingProfile(!isEditingProfile)}
+              >
+                {isEditingProfile ? "Cancel Edit" : "Edit Profile"}
+              </Button>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
                   <Label htmlFor="p-name">Full Name</Label>
-                  <Input id="p-name" value={profileName} onChange={(e) => setProfileName(e.target.value)} className="rounded-xl" />
+                  <Input id="p-name" value={profileName} onChange={(e) => setProfileName(e.target.value)} disabled={!isEditingProfile} className="rounded-xl disabled:bg-slate-50/50" />
                 </div>
                 <div className="space-y-1.5">
                   <Label htmlFor="p-email">Email Address</Label>
-                  <Input id="p-email" type="email" value={profileEmail} onChange={(e) => setProfileEmail(e.target.value)} className="rounded-xl" />
+                  <Input id="p-email" type="email" value={profileEmail} onChange={(e) => setProfileEmail(e.target.value)} disabled={!isEditingProfile} className="rounded-xl disabled:bg-slate-50/50" />
                 </div>
               </div>
               <div className="space-y-1.5">
@@ -448,16 +461,23 @@ export function Settings() {
                   className="rounded-xl bg-slate-50 text-slate-500"
                 />
               </div>
-              <div className="flex justify-end pt-2">
-                <Button
-                  disabled={isSavingProfile}
-                  className="rounded-xl text-white px-6"
-                  style={{ background: "linear-gradient(135deg, #0a1565, #1229b3)" }}
-                  onClick={() => requestConfirm("Update Profile", "Are you sure you want to permanently save changes to your profile name and email address?", "Save Profile", handleUpdateProfile)}
-                >
-                  {isSavingProfile ? "Saving..." : "Save Changes"}
-                </Button>
-              </div>
+              {isEditingProfile && (
+                <div className="flex justify-end pt-2 border-t border-slate-50 mt-4">
+                  <Button
+                    disabled={isSavingProfile}
+                    className="rounded-xl text-white px-6"
+                    style={{ background: "linear-gradient(135deg, #0a1565, #1229b3)" }}
+                    onClick={() => {
+                      requestConfirm("Update Profile", "Are you sure you want to permanently save changes to your profile name and email address?", "Save Profile", async () => {
+                        await handleUpdateProfile();
+                        setIsEditingProfile(false);
+                      });
+                    }}
+                  >
+                    {isSavingProfile ? "Saving..." : "Save Changes"}
+                  </Button>
+                </div>
+              )}
             </CardContent>
           </Card>
         )}
@@ -465,7 +485,7 @@ export function Settings() {
         {/* Security Tab */}
         {activeTab === "security" && (
           <Card className="rounded-2xl border-slate-100 shadow-sm">
-            <CardHeader className="pb-4">
+            <CardHeader className="pb-4 flex-col sm:flex-row sm:items-start justify-between gap-4">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-xl bg-amber-100 flex items-center justify-center shrink-0">
                   <Shield className="h-5 w-5 text-amber-600" />
@@ -475,28 +495,45 @@ export function Settings() {
                   <CardDescription className="mt-0.5">Manage your password and security preferences</CardDescription>
                 </div>
               </div>
+              <Button
+                variant={isEditingSecurity ? "default" : "outline"}
+                className={`rounded-xl h-9 px-4 text-sm ${isEditingSecurity ? "bg-slate-100 text-slate-800 hover:bg-slate-200" : ""}`}
+                onClick={() => {
+                  setIsEditingSecurity(!isEditingSecurity);
+                  setNewPass(""); setConfirmPass("");
+                }}
+              >
+                {isEditingSecurity ? "Cancel Edit" : "Change Password"}
+              </Button>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
                   <Label htmlFor="new-pass">New Password</Label>
-                  <Input id="new-pass" type="password" value={newPass} onChange={(e) => setNewPass(e.target.value)} placeholder="••••••••" className="rounded-xl" />
+                  <Input id="new-pass" type="password" value={newPass} onChange={(e) => setNewPass(e.target.value)} disabled={!isEditingSecurity} placeholder={isEditingSecurity ? "••••••••" : "Protected"} className="rounded-xl disabled:bg-slate-50/50" />
                 </div>
                 <div className="space-y-1.5">
                   <Label htmlFor="confirm-pass">Confirm Password</Label>
-                  <Input id="confirm-pass" type="password" value={confirmPass} onChange={(e) => setConfirmPass(e.target.value)} placeholder="••••••••" className="rounded-xl" />
+                  <Input id="confirm-pass" type="password" value={confirmPass} onChange={(e) => setConfirmPass(e.target.value)} disabled={!isEditingSecurity} placeholder={isEditingSecurity ? "••••••••" : "Protected"} className="rounded-xl disabled:bg-slate-50/50" />
                 </div>
               </div>
-              <div className="flex justify-end pt-2">
-                <Button 
-                  disabled={isSavingPass} 
-                  className="rounded-xl text-white px-6" 
-                  style={{ background: "linear-gradient(135deg, #0a1565, #1229b3)" }}
-                  onClick={() => requestConfirm("Update Password", "Are you sure you want to change your password? Doing so might require you to login again.", "Change Password", handleUpdatePassword)}
-                >
-                  {isSavingPass ? "Updating..." : "Update Password"}
-                </Button>
-              </div>
+              {isEditingSecurity && (
+                <div className="flex justify-end pt-2 border-t border-slate-50 mt-4">
+                  <Button 
+                    disabled={isSavingPass} 
+                    className="rounded-xl text-white px-6" 
+                    style={{ background: "linear-gradient(135deg, #0a1565, #1229b3)" }}
+                    onClick={() => {
+                      requestConfirm("Update Password", "Are you sure you want to change your password? Doing so might require you to login again.", "Change Password", async () => {
+                        await handleUpdatePassword();
+                        setIsEditingSecurity(false);
+                      });
+                    }}
+                  >
+                    {isSavingPass ? "Updating..." : "Update Password"}
+                  </Button>
+                </div>
+              )}
             </CardContent>
           </Card>
         )}
@@ -668,6 +705,7 @@ export function Settings() {
             </Card>
           </div>
         )}
+        </div>
       </div>
 
       {/* Create Staff Modal */}

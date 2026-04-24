@@ -141,34 +141,54 @@ export function Reports() {
   // ── Exports ────────────────────────────────────────────────────
   const exportToPDF = () => {
     const doc = new jsPDF();
-    doc.setFillColor(10, 21, 101);
-    doc.rect(0, 0, 220, 35, "F");
-    doc.setTextColor(255, 255, 255);
-    doc.setFontSize(16);
-    doc.text("GISSMATIC — Stock Movement Report", 14, 15);
-    doc.setFontSize(9);
-    doc.text(`Generated: ${new Date().toLocaleString()}`, 14, 26);
-    doc.setTextColor(0, 0, 0);
-    doc.setFontSize(10);
-    doc.text("Summary", 14, 48);
-    doc.setFontSize(9);
-    doc.text(`Stock-In: ${stockInEvents.length} events`, 14, 56);
-    doc.text(`Stock-Out: ${stockOutEvents.length} events`, 14, 62);
-    doc.text(`Adjustments: ${adjustmentEvents.length} events`, 14, 68);
-    doc.text(`Frozen: ${frozenEvents.length} events`, 14, 74);
-    autoTable(doc, {
-      startY: 82,
-      head: [["Timestamp", "User", "Action", "Product", "Change", "Customer", "Reference/Note"]],
-      body: filteredLogs.map((log) => {
-        const { date, time } = formatTs(log.timestamp);
-        return [`${date}\n${time}`, log.userName, log.action, log.itemName, log.changeDetail, log.customerName || "—", log.note || "—"];
-      }),
-      theme: "grid",
-      headStyles: { fillColor: [10, 21, 101], textColor: 255, fontSize: 8 },
-      styles: { fontSize: 7.5, cellPadding: 2 },
-      columnStyles: { 0: { cellWidth: 22 }, 4: { fontStyle: "bold" } },
-    });
-    doc.save(`gissmatic-movements-${Date.now()}.pdf`);
+    const img = new Image();
+    img.crossOrigin = "Anonymous";
+    img.src = "/logo.png";
+
+    const generatePdf = (imgData?: HTMLImageElement) => {
+      doc.setFillColor(10, 21, 101);
+      doc.rect(0, 0, 220, 35, "F");
+      
+      if (imgData) {
+        doc.addImage(imgData, "PNG", 14, 6, 20, 20);
+        doc.setTextColor(255, 255, 255);
+        doc.setFontSize(16);
+        doc.text("GISSMATIC — Stock Movement Report", 40, 18);
+        doc.setFontSize(9);
+        doc.text(`Generated: ${new Date().toLocaleString()}`, 40, 26);
+      } else {
+        doc.setTextColor(255, 255, 255);
+        doc.setFontSize(16);
+        doc.text("GISSMATIC — Stock Movement Report", 14, 15);
+        doc.setFontSize(9);
+        doc.text(`Generated: ${new Date().toLocaleString()}`, 14, 26);
+      }
+      
+      doc.setTextColor(0, 0, 0);
+      doc.setFontSize(10);
+      doc.text("Summary", 14, 48);
+      doc.setFontSize(9);
+      doc.text(`Stock-In: ${stockInEvents.length} events`, 14, 56);
+      doc.text(`Stock-Out: ${stockOutEvents.length} events`, 14, 62);
+      doc.text(`Adjustments: ${adjustmentEvents.length} events`, 14, 68);
+      doc.text(`Frozen: ${frozenEvents.length} events`, 14, 74);
+      autoTable(doc, {
+        startY: 82,
+        head: [["Timestamp", "User", "Action", "Product", "Change", "Customer", "Reference/Note"]],
+        body: filteredLogs.map((log) => {
+          const { date, time } = formatTs(log.timestamp);
+          return [`${date}\n${time}`, log.userName, log.action, log.itemName, log.changeDetail, log.customerName || "—", log.note || "—"];
+        }),
+        theme: "grid",
+        headStyles: { fillColor: [10, 21, 101], textColor: 255, fontSize: 8 },
+        styles: { fontSize: 7.5, cellPadding: 2 },
+        columnStyles: { 0: { cellWidth: 22 }, 4: { fontStyle: "bold" } },
+      });
+      doc.save(`gissmatic-movements-${Date.now()}.pdf`);
+    };
+
+    img.onload = () => generatePdf(img);
+    img.onerror = () => generatePdf();
   };
 
   const exportToExcel = () => {

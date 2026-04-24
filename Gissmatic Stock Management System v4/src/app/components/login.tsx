@@ -7,7 +7,7 @@ import { useAuth } from "./auth-context";
 import { toast } from "sonner";
 import { supabase } from "../../lib/supabase";
 
-const logoImage = "https://placehold.co/100x100/16c60c/ffffff?text=G&font=roboto";
+const logoImage = "/logo.png";
 
 export function Login() {
   const [email, setEmail] = useState("");
