@@ -190,7 +190,7 @@ function StaffPermissionsPanel({ user, permissions, onUpdate, onDelete }: {
 }
 
 export function Settings() {
-  const { currentUser, users, addUser, deleteUser, getUserPermissions, updateUserPermissions } = useAuth();
+  const { currentUser, users, addUser, deleteUser, getUserPermissions, updateUserPermissions, updateProfile, updatePassword } = useAuth();
   const [activeTab, setActiveTab] = useState<SettingsTab>("profile");
   const [notifLowStock, setNotifLowStock] = useState(true);
   const [notifEmail, setNotifEmail] = useState(false);
@@ -202,11 +202,58 @@ export function Settings() {
   const [staffForm, setStaffForm] = useState({ name: "", email: "", role: "viewer" as UserRole });
   const [isCreating, setIsCreating] = useState(false);
 
+  // Profile Form State
+  const [profileName, setProfileName] = useState(currentUser?.name || "");
+  const [profileEmail, setProfileEmail] = useState(currentUser?.email || "");
+  const [isSavingProfile, setIsSavingProfile] = useState(false);
+
+  // Security Form State
+  const [newPass, setNewPass] = useState("");
+  const [confirmPass, setConfirmPass] = useState("");
+  const [isSavingPass, setIsSavingPass] = useState(false);
+
   const nonAdminUsers = users.filter((u) => u.role !== "superadmin");
   const filteredStaff = nonAdminUsers.filter((u) =>
     u.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     u.email.toLowerCase().includes(searchQuery.toLowerCase())
   );
+
+  const handleUpdateProfile = async () => {
+    if (!profileName.trim() || !profileEmail.trim()) {
+      toast.error("Name and email are required");
+      return;
+    }
+    setIsSavingProfile(true);
+    const { success, error } = await updateProfile(profileName.trim(), profileEmail.trim());
+    setIsSavingProfile(false);
+    if (success) toast.success("Profile updated successfully");
+    else toast.error(error || "Failed to update profile");
+  };
+
+  const handleUpdatePassword = async () => {
+    if (!newPass || !confirmPass) {
+      toast.error("Please fill in the new password fields");
+      return;
+    }
+    if (newPass !== confirmPass) {
+      toast.error("New passwords do not match");
+      return;
+    }
+    if (newPass.length < 6) {
+      toast.error("Password must be at least 6 characters");
+      return;
+    }
+    setIsSavingPass(true);
+    const { success, error } = await updatePassword(newPass);
+    setIsSavingPass(false);
+    if (success) {
+      toast.success("Password updated successfully");
+      setNewPass("");
+      setConfirmPass("");
+    } else {
+      toast.error(error || "Failed to update password");
+    }
+  };
 
   const handleCreateStaff = async () => {
     if (!staffForm.name || !staffForm.email) { toast.error("Please fill in all fields"); return; }
@@ -289,11 +336,11 @@ export function Settings() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
                   <Label htmlFor="p-name">Full Name</Label>
-                  <Input id="p-name" defaultValue={currentUser?.name} className="rounded-xl" />
+                  <Input id="p-name" value={profileName} onChange={(e) => setProfileName(e.target.value)} className="rounded-xl" />
                 </div>
                 <div className="space-y-1.5">
                   <Label htmlFor="p-email">Email Address</Label>
-                  <Input id="p-email" type="email" defaultValue={currentUser?.email} className="rounded-xl" />
+                  <Input id="p-email" type="email" value={profileEmail} onChange={(e) => setProfileEmail(e.target.value)} className="rounded-xl" />
                 </div>
               </div>
               <div className="space-y-1.5">
@@ -306,11 +353,12 @@ export function Settings() {
                 />
               </div>
               <Button
+                disabled={isSavingProfile}
                 className="rounded-xl text-white"
                 style={{ background: "linear-gradient(135deg, #0a1565, #1229b3)" }}
-                onClick={() => toast.success("Profile updated")}
+                onClick={handleUpdateProfile}
               >
-                Save Changes
+                {isSavingProfile ? "Saving..." : "Save Changes"}
               </Button>
             </CardContent>
           </Card>
@@ -331,22 +379,18 @@ export function Settings() {
               </div>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="space-y-1.5">
-                <Label htmlFor="curr-pass">Current Password</Label>
-                <Input id="curr-pass" type="password" placeholder="••••••••" className="rounded-xl" />
-              </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
                   <Label htmlFor="new-pass">New Password</Label>
-                  <Input id="new-pass" type="password" placeholder="••••••••" className="rounded-xl" />
+                  <Input id="new-pass" type="password" value={newPass} onChange={(e) => setNewPass(e.target.value)} placeholder="••••••••" className="rounded-xl" />
                 </div>
                 <div className="space-y-1.5">
                   <Label htmlFor="confirm-pass">Confirm Password</Label>
-                  <Input id="confirm-pass" type="password" placeholder="••••••••" className="rounded-xl" />
+                  <Input id="confirm-pass" type="password" value={confirmPass} onChange={(e) => setConfirmPass(e.target.value)} placeholder="••••••••" className="rounded-xl" />
                 </div>
               </div>
-              <Button variant="outline" className="rounded-xl" onClick={() => toast.success("Password updated")}>
-                Update Password
+              <Button disabled={isSavingPass} variant="outline" className="rounded-xl" onClick={handleUpdatePassword}>
+                {isSavingPass ? "Updating..." : "Update Password"}
               </Button>
             </CardContent>
           </Card>

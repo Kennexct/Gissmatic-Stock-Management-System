@@ -17,6 +17,8 @@ interface AuthContextType {
   currency: string;
   login: (email: string, password: string) => Promise<{ success: boolean; needsSetup?: boolean; error?: string }>;
   logout: () => Promise<void>;
+  updateProfile: (name: string, email: string) => Promise<{ success: boolean; error?: string }>;
+  updatePassword: (newPass: string) => Promise<{ success: boolean; error?: string }>;
   addUser: (user: Omit<User, "id" | "createdAt">) => Promise<{ success: boolean; error?: string }>;
   deleteUser: (id: string) => void;
   addProduct: (product: Omit<Product, "id" | "lastUpdated">) => void;
@@ -126,6 +128,33 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await supabase.auth.signOut();
     setCurrentUser(null); 
     localStorage.removeItem("currentUser"); 
+  };
+
+  const updateProfile = async (name: string, email: string): Promise<{ success: boolean; error?: string }> => {
+    if (!currentUser) return { success: false, error: "Not logged in" };
+    // Update local state first (optimistic)
+    const updatedUser = { ...currentUser, name, email };
+    setCurrentUser(updatedUser);
+    // Update users array
+    setUsers(users.map(u => u.id === currentUser.id ? { ...u, name, email } : u));
+    
+    // Update Supabase DB
+    const { error: dbError } = await supabase.from('users').update({ name, email }).eq('id', currentUser.id);
+    if (dbError) return { success: false, error: dbError.message };
+    
+    // Update Supabase Auth if email changed
+    if (email !== currentUser.email) {
+      const { error: authError } = await supabase.auth.updateUser({ email });
+      if (authError) return { success: false, error: authError.message };
+    }
+    return { success: true };
+  };
+
+  const updatePassword = async (newPass: string): Promise<{ success: boolean; error?: string }> => {
+    if (!currentUser) return { success: false, error: "Not logged in" };
+    const { error } = await supabase.auth.updateUser({ password: newPass });
+    if (error) return { success: false, error: error.message };
+    return { success: true };
   };
 
   const addUser = async (userData: Omit<User, "id" | "createdAt">): Promise<{ success: boolean; error?: string }> => {
@@ -277,7 +306,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   return (
     <AuthContext.Provider value={{
       currentUser, users, products, auditLogs, suppliers, customers, outgoingSales, frozenStocks,
-      permissions, categories, currency, login, logout, addUser, deleteUser,
+      permissions, categories, currency, login, logout, updateProfile, updatePassword, addUser, deleteUser,
       addProduct, updateProduct, addAuditLog, addSupplier, updateSupplier, addCustomer, deleteCustomer,
       addOutgoingSale, addFrozenStock, releaseFrozenStock, addCategory, setCurrency,
       getUserPermissions, updateUserPermissions,
