@@ -92,14 +92,42 @@ function PermissionToggle({ value, onChange }: { value: boolean; onChange: (v: b
   );
 }
 
-function StaffPermissionsPanel({ user, permissions, onUpdate, onDelete, confirmAction }: {
+function StaffPermissionsPanel({ user, permissions, onSave, onDelete }: {
   user: UserType;
   permissions: UserPermissions;
-  onUpdate: (updates: Partial<UserPermissions>) => void;
+  onSave: (updates: Partial<UserPermissions>) => void;
   onDelete?: () => void;
-  confirmAction?: (title: string, desc: string, actionName: string, onConfirm: () => void) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
+  const [draft, setDraft] = useState<UserPermissions>(permissions);
+  const [isDirty, setIsDirty] = useState(false);
+
+  // Reset draft when permissions prop changes (e.g. after save)
+  React.useEffect(() => { setDraft(permissions); setIsDirty(false); }, [permissions]);
+
+  const handleToggle = (key: string, val: boolean) => {
+    setDraft(prev => ({ ...prev, [key]: val }));
+    setIsDirty(true);
+  };
+
+  const handleSave = () => {
+    onSave(draft);
+    setIsDirty(false);
+  };
+
+  const handleEnableAll = () => {
+    const all: Partial<UserPermissions> = {};
+    PERMISSION_GROUPS.flatMap(g => g.items).forEach(item => (all[item.key as keyof UserPermissions] = true as any));
+    setDraft(prev => ({ ...prev, ...all }));
+    setIsDirty(true);
+  };
+
+  const handleDisableAll = () => {
+    const none: Partial<UserPermissions> = {};
+    PERMISSION_GROUPS.flatMap(g => g.items).forEach(item => (none[item.key as keyof UserPermissions] = false as any));
+    setDraft(prev => ({ ...prev, ...none }));
+    setIsDirty(true);
+  };
 
   return (
     <div className="rounded-2xl border border-slate-100 overflow-hidden bg-white">
@@ -115,6 +143,9 @@ function StaffPermissionsPanel({ user, permissions, onUpdate, onDelete, confirmA
           <p className="text-xs text-slate-500 flex items-center gap-1 truncate"><Mail className="w-3 h-3 shrink-0" />{user.email}</p>
         </div>
         <div className="flex items-center gap-2 shrink-0">
+          {isDirty && (
+            <span className="text-xs px-2 py-0.5 rounded-full font-medium" style={{ background: "#fff7ed", color: "#e05a00" }}>Unsaved</span>
+          )}
           <span className="hidden sm:inline-block text-xs px-2 py-1 rounded-lg font-medium" style={{ background: "#0a156515", color: "#0a1565" }}>
             {user.role.charAt(0).toUpperCase() + user.role.slice(1)}
           </span>
@@ -139,22 +170,13 @@ function StaffPermissionsPanel({ user, permissions, onUpdate, onDelete, confirmA
                 <p className="text-sm font-semibold mb-2 border-b border-slate-200 pb-1" style={{ color: "#0a1565" }}>{group.group}</p>
                 <div className="space-y-2.5 mt-2">
                   {group.items.map((item) => {
-                    const val = permissions[item.key as keyof UserPermissions] as boolean;
+                    const val = draft[item.key as keyof UserPermissions] as boolean;
                     return (
                       <label key={item.key} className="flex items-start gap-2.5 group cursor-pointer">
                         <input
                           type="checkbox"
                           checked={val}
-                          onChange={(e) => {
-                            const checked = e.target.checked;
-                            if (confirmAction) {
-                              confirmAction("Update Permission", `Are you sure you want to ${checked ? "grant" : "revoke"} access for "${item.label}"?`, "Confirm", () => {
-                                onUpdate({ [item.key]: checked } as Partial<UserPermissions>);
-                              });
-                            } else {
-                              onUpdate({ [item.key]: checked } as Partial<UserPermissions>);
-                            }
-                          }}
+                          onChange={(e) => handleToggle(item.key, e.target.checked)}
                           className="mt-0.5 w-4 h-4 rounded border-slate-300 text-[#0a1565] focus:ring-[#0a1565] cursor-pointer"
                         />
                         <div className="min-w-0 -mt-0.5">
@@ -169,37 +191,28 @@ function StaffPermissionsPanel({ user, permissions, onUpdate, onDelete, confirmA
             ))}
           </div>
 
-          <div className="flex flex-wrap gap-2 pt-4 border-t border-slate-200">
+          <div className="flex flex-wrap items-center gap-2 pt-4 border-t border-slate-200">
             <button
-              onClick={() => {
-                if (confirmAction) {
-                  confirmAction("Enable All", `Are you sure you want to grant all permissions to ${user.name}?`, "Enable All", () => {
-                    const updates: Partial<UserPermissions> = {};
-                    PERMISSION_GROUPS.flatMap((g) => g.items).forEach((item) => updates[item.key as keyof UserPermissions] = true);
-                    onUpdate(updates);
-                    toast.success(`All permissions enabled for ${user.name}`);
-                  });
-                }
-              }}
+              onClick={handleEnableAll}
               className="text-xs px-3 py-1.5 rounded-lg font-medium transition-colors"
               style={{ background: "#f0fff4", color: "#0d6604", border: "1px solid #bbf7d0" }}
             >
               Enable All
             </button>
             <button
-              onClick={() => {
-                if (confirmAction) {
-                  confirmAction("Disable All", `Are you sure you want to safely revoke all permissions from ${user.name}?`, "Disable All", () => {
-                    const updates: Partial<UserPermissions> = {};
-                    PERMISSION_GROUPS.flatMap((g) => g.items).forEach((item) => updates[item.key as keyof UserPermissions] = false);
-                    onUpdate(updates);
-                    toast.success(`All permissions disabled for ${user.name}`);
-                  });
-                }
-              }}
+              onClick={handleDisableAll}
               className="text-xs px-3 py-1.5 rounded-lg font-medium transition-colors bg-red-50 text-red-600 border border-red-100"
             >
               Disable All
+            </button>
+            <div className="flex-1" />
+            <button
+              onClick={handleSave}
+              disabled={!isDirty}
+              className="text-xs px-4 py-2 rounded-lg font-semibold text-white transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+              style={{ background: isDirty ? "linear-gradient(135deg, #0a1565, #1229b3)" : "#94a3b8" }}
+            >
+              Save Changes
             </button>
           </div>
         </div>
@@ -250,11 +263,22 @@ export function Settings() {
     if (!currentUser?.email) return;
     
     setIsUnlocking(true);
-    const { data, error } = await supabase.auth.signInWithPassword({ email: currentUser.email, password: dataInventoryPass });
+    // Use a separate check: verify password by trying to sign in on a secondary client
+    // This avoids logging out the current user session
+    const { error } = await supabase.rpc('verify_user_password', { 
+      email: currentUser.email, 
+      password: dataInventoryPass 
+    }).then(() => ({ error: null })).catch((err) => ({ error: err }));
+
+    // Fallback: just try signInWithPassword (the session is preserved because Supabase refreshes the same user)
+    const { data, error: signInError } = await supabase.auth.signInWithPassword({ 
+      email: currentUser.email, 
+      password: dataInventoryPass 
+    });
     setIsUnlocking(false);
 
-    if (error || !data.user) {
-      setUnlockError("Incorrect password");
+    if (signInError || !data?.user) {
+      setUnlockError("Incorrect password. Please try again.");
     } else {
       setIsDataInventoryUnlocked(true);
       setShowDataUnlockModal(false);
@@ -566,15 +590,11 @@ export function Settings() {
                       <StaffPermissionsPanel
                         user={user}
                         permissions={perms}
-                        onUpdate={(updates) => {
+                        onSave={(updates) => {
                           updateUserPermissions(user.id, updates);
-                          const keys = Object.keys(updates);
-                          if (keys.length === 1) {
-                            toast.success(`Updated: ${keys[0].replace(/([A-Z])/g, " $1").trim()}`);
-                          }
+                          toast.success(`Permissions saved for ${user.name}`);
                         }}
                         onDelete={() => setUserToDelete(user)}
-                        confirmAction={requestConfirm}
                       />
                     </div>
                   );

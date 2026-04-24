@@ -293,7 +293,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const addProduct = async (productData: Omit<Product, "id" | "lastUpdated">) => {
-    // 1. Optimistic Local Update
+    // 0. If a custom supplier name was typed that isn't in our list, auto-create it
+    if (productData.supplierName) {
+      const exists = suppliers.some(s => s.name.toLowerCase() === productData.supplierName.toLowerCase());
+      if (!exists) {
+        await addSupplier({ name: productData.supplierName, phone: "", email: "", address: "", country: "" });
+      }
+    }
     const tempId = `P${Date.now()}`;
     const newProduct: Product = { ...productData, id: tempId, lastUpdated: new Date().toISOString() };
     setProducts(prev => [newProduct, ...prev]);
@@ -369,9 +375,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     });
   };
 
-  const addSupplier = (supplierData: Omit<Supplier, "id" | "createdAt">) => {
-    const newSupplier: Supplier = { ...supplierData, id: `S${Date.now()}`, createdAt: new Date().toISOString() };
-    setSuppliers([...suppliers, newSupplier]);
+  const addSupplier = async (supplierData: Omit<Supplier, "id" | "createdAt">) => {
+    const createdAt = new Date().toISOString();
+    const tempId = `S${Date.now()}`;
+    const newSupplier: Supplier = { ...supplierData, id: tempId, createdAt };
+    setSuppliers(prev => [...prev, newSupplier]);
+    // Sync to Supabase
+    const { data } = await supabase.from('suppliers').insert({
+      name: supplierData.name,
+      phone: supplierData.phone || null,
+      email: supplierData.email || null,
+      address: supplierData.address || null,
+      country: supplierData.country || null,
+      created_at: createdAt,
+    }).select().single();
+    if (data?.id) {
+      setSuppliers(prev => prev.map(s => s.id === tempId ? { ...s, id: data.id } : s));
+    }
   };
 
   const updateSupplier = (id: string, updates: Partial<Supplier>) => {
