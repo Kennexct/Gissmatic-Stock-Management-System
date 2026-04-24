@@ -567,41 +567,64 @@ export function GlobalActionsProvider({ children }: { children: React.ReactNode 
 
             {/* New product form */}
             {addIsNew && (
-              <div className="space-y-3 rounded-xl p-4 border border-slate-200 bg-slate-50">
+              <div className="space-y-4 rounded-xl p-5 border border-slate-200 bg-white shadow-sm mt-4">
                 <p className="text-sm font-semibold" style={{ color: "#0a1565" }}>New Product Details</p>
                 <div className="space-y-1.5">
                   <Label htmlFor="np-name">Product Name *</Label>
                   <Input id="np-name" placeholder="Enter product name" value={newProdForm.name} onChange={(e) => setNewProdForm({ ...newProdForm, name: e.target.value })} className="rounded-xl" />
                 </div>
+                
+                <div className="space-y-1.5">
+                  <div className="flex justify-between items-center">
+                    <Label>Category *</Label>
+                    <button 
+                      type="button" 
+                      onClick={() => { setIsCustomCategory(!isCustomCategory); setNewProdForm({...newProdForm, category: ""}); }} 
+                      className="text-xs font-semibold text-[#0a1565] hover:underline"
+                    >
+                      {isCustomCategory ? "Pick Existing" : "+ New Category"}
+                    </button>
+                  </div>
+                  {isCustomCategory ? (
+                    <Input placeholder="Type new category..." value={newProdForm.category} onChange={(e) => setNewProdForm({ ...newProdForm, category: e.target.value })} className="rounded-xl" autoFocus />
+                  ) : (
+                    <Select value={newProdForm.category} onValueChange={(v) => setNewProdForm({ ...newProdForm, category: v })}>
+                      <SelectTrigger className="rounded-xl"><SelectValue placeholder="Select a category" /></SelectTrigger>
+                      <SelectContent>{categories.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
+                    </Select>
+                  )}
+                </div>
+
+                <div className="space-y-1.5">
+                  <div className="flex justify-between items-center">
+                    <Label>Supplier</Label>
+                    <button 
+                      type="button" 
+                      onClick={() => { setIsCustomSupplier(!isCustomSupplier); setNewProdForm({...newProdForm, supplierName: ""}); }} 
+                      className="text-xs font-semibold text-[#0a1565] hover:underline"
+                    >
+                      {isCustomSupplier ? "Pick Existing" : "+ New Supplier"}
+                    </button>
+                  </div>
+                  {isCustomSupplier ? (
+                    <Input placeholder="Type new supplier name..." value={newProdForm.supplierName} onChange={(e) => setNewProdForm({ ...newProdForm, supplierName: e.target.value })} className="rounded-xl" autoFocus />
+                  ) : (
+                    <Select value={newProdForm.supplierName} onValueChange={(v) => setNewProdForm({ ...newProdForm, supplierName: v })}>
+                      <SelectTrigger className="rounded-xl"><SelectValue placeholder="Select supplier (optional)" /></SelectTrigger>
+                      <SelectContent>{suppliers.map((s) => <SelectItem key={s.id} value={s.name}>{s.name}</SelectItem>)}</SelectContent>
+                    </Select>
+                  )}
+                </div>
+
                 <div className="space-y-1.5">
                   <Label>Tracking Type *</Label>
                   <Select value={newProdForm.trackingType} onValueChange={(v: "SN" | "QTY") => setNewProdForm({ ...newProdForm, trackingType: v })}>
                     <SelectTrigger className="rounded-xl"><SelectValue /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="SN">Serial Number (track individual units)</SelectItem>
                       <SelectItem value="QTY">Quantity (bulk tracking)</SelectItem>
+                      <SelectItem value="SN">Serial Number (track individual units)</SelectItem>
                     </SelectContent>
                   </Select>
-                </div>
-                <div className="space-y-1.5">
-                  <Label>Category *</Label>
-                  <div className="flex gap-2">
-                    <Select value={newProdForm.category} onValueChange={(v) => setNewProdForm({ ...newProdForm, category: v })}>
-                      <SelectTrigger className="rounded-xl flex-1"><SelectValue placeholder="Select category" /></SelectTrigger>
-                      <SelectContent>{categories.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
-                    </Select>
-                    <Button type="button" variant="outline" size="icon" className="rounded-xl shrink-0" onClick={() => setIsAddCategoryOpen(true)}><Plus className="h-4 w-4" /></Button>
-                  </div>
-                </div>
-                <div className="space-y-1.5">
-                  <Label>Supplier *</Label>
-                  <div className="flex gap-2">
-                    <Select value={newProdForm.supplierName} onValueChange={(v) => setNewProdForm({ ...newProdForm, supplierName: v })}>
-                      <SelectTrigger className="rounded-xl flex-1"><SelectValue placeholder="Select supplier" /></SelectTrigger>
-                      <SelectContent>{suppliers.map((s) => <SelectItem key={s.id} value={s.name}>{s.name}</SelectItem>)}</SelectContent>
-                    </Select>
-                    <Button type="button" variant="outline" size="icon" className="rounded-xl shrink-0" onClick={() => setIsAddSupplierOpen(true)}><Plus className="h-4 w-4" /></Button>
-                  </div>
                 </div>
                 {/* Initial stock */}
                 {newProdForm.trackingType === "SN" && (

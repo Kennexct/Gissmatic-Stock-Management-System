@@ -27,6 +27,7 @@ function AddNewProductModal({ onClose }: { onClose: () => void }) {
   const [addSnList, setAddSnList] = useState<string[]>([]);
   const [addQty, setAddQty] = useState("");
   const [isCustomCategory, setIsCustomCategory] = useState(false);
+  const [isCustomSupplier, setIsCustomSupplier] = useState(false);
 
   const handleAddSn = () => {
     const sn = addSnInput.trim();
@@ -99,11 +100,24 @@ function AddNewProductModal({ onClose }: { onClose: () => void }) {
             )}
           </div>
           <div className="space-y-1.5">
-            <Label>Supplier</Label>
-            <Select value={form.supplierName} onValueChange={(v) => setForm({ ...form, supplierName: v })}>
-              <SelectTrigger className="rounded-xl"><SelectValue placeholder="Select supplier (optional)" /></SelectTrigger>
-              <SelectContent>{suppliers.map((s) => <SelectItem key={s.id} value={s.name}>{s.name}</SelectItem>)}</SelectContent>
-            </Select>
+            <div className="flex justify-between items-center">
+              <Label>Supplier</Label>
+              <button 
+                type="button" 
+                onClick={() => { setIsCustomSupplier(!isCustomSupplier); setForm({...form, supplierName: ""}); }} 
+                className="text-xs font-semibold text-[#0a1565] hover:underline"
+              >
+                {isCustomSupplier ? "Pick Existing" : "+ New Supplier"}
+              </button>
+            </div>
+            {isCustomSupplier ? (
+              <Input placeholder="Type new supplier name..." value={form.supplierName} onChange={(e) => setForm({ ...form, supplierName: e.target.value })} className="rounded-xl" autoFocus />
+            ) : (
+              <Select value={form.supplierName} onValueChange={(v) => setForm({ ...form, supplierName: v })}>
+                <SelectTrigger className="rounded-xl"><SelectValue placeholder="Select supplier (optional)" /></SelectTrigger>
+                <SelectContent>{suppliers.map((s) => <SelectItem key={s.id} value={s.name}>{s.name}</SelectItem>)}</SelectContent>
+              </Select>
+            )}
           </div>
           <div className="space-y-1.5">
             <Label>Tracking Type *</Label>
