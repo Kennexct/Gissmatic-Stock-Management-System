@@ -163,6 +163,34 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           note: db.note,
         })));
       }
+
+      // ── Suppliers ──
+      const { data: supplierData } = await supabase.from('suppliers').select('*').order('created_at', { ascending: false });
+      if (supplierData && supplierData.length > 0) {
+        setSuppliers(supplierData.map((db: any) => ({
+          id: db.id,
+          name: db.name,
+          phone: db.phone || '',
+          email: db.email || '',
+          address: db.address || '',
+          country: db.country || '',
+          createdAt: db.created_at,
+        })));
+      }
+
+      // ── Customers ──
+      const { data: customerData } = await supabase.from('customers').select('*').order('created_at', { ascending: false });
+      if (customerData && customerData.length > 0) {
+        setCustomers(customerData.map((db: any) => ({
+          id: db.id,
+          name: db.name,
+          email: db.email || '',
+          phone: db.phone || '',
+          address: db.address || '',
+          country: db.country || '',
+          createdAt: db.created_at,
+        })));
+      }
     };
     fetchAllFromSupabase();
   }, []);
@@ -394,8 +422,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const updateSupplier = (id: string, updates: Partial<Supplier>) => {
-    setSuppliers(suppliers.map((s) => s.id === id ? { ...s, ...updates } : s));
+  const updateSupplier = async (id: string, updates: Partial<Supplier>) => {
+    setSuppliers(prev => prev.map((s) => s.id === id ? { ...s, ...updates } : s));
+    // Sync to Supabase
+    const dbPayload: any = {};
+    if (updates.name !== undefined) dbPayload.name = updates.name;
+    if (updates.phone !== undefined) dbPayload.phone = updates.phone;
+    if (updates.email !== undefined) dbPayload.email = updates.email;
+    if (updates.address !== undefined) dbPayload.address = updates.address;
+    if (updates.country !== undefined) dbPayload.country = updates.country;
+    if (Object.keys(dbPayload).length > 0) {
+      const { error } = await supabase.from('suppliers').update(dbPayload).eq('id', id);
+      if (error) console.error('Supabase updateSupplier error:', error);
+    }
   };
 
   const addCustomer = (customerData: Omit<Customer, "id" | "createdAt">) => {

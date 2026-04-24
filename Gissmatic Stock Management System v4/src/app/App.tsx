@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { AuthProvider, useAuth } from "./components/auth-context";
 import { GlobalActionsProvider } from "./components/global-actions";
+import { CrudProgressProvider } from "./components/crud-progress";
 import { Login } from "./components/login";
 import { Sidebar } from "./components/sidebar";
 import { Dashboard } from "./components/dashboard";
@@ -70,9 +71,11 @@ function AppContent() {
 
 export default function App() {
   return (
-    <AuthProvider>
-      <AppContent />
-      <Toaster position="bottom-left" richColors closeButton />
-    </AuthProvider>
+    <CrudProgressProvider>
+      <AuthProvider>
+        <AppContent />
+        <Toaster position="bottom-left" richColors closeButton />
+      </AuthProvider>
+    </CrudProgressProvider>
   );
 }

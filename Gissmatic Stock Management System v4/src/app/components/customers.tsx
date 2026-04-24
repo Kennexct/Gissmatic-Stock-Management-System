@@ -15,11 +15,13 @@ import {
 } from "./ui/dialog";
 import { Card, CardContent } from "./ui/card";
 import { useAuth } from "./auth-context";
+import { useCrudProgress } from "./crud-progress";
 import { Customer } from "../../lib/types";
 import { toast } from "sonner";
 
 export function Customers() {
   const { customers, outgoingSales, addCustomer, deleteCustomer } = useAuth();
+  const crud = useCrudProgress();
   const [searchQuery, setSearchQuery] = useState("");
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [expandedCustomer, setExpandedCustomer] = useState<string | null>(null);
@@ -40,14 +42,17 @@ export function Customers() {
 
   const totalMovements = outgoingSales.length;
 
-  const handleAddCustomer = () => {
+  const handleAddCustomer = async () => {
     if (!formData.name || !formData.email || !formData.phone) {
       toast.error("Name, email and phone are required"); return;
     }
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(formData.email)) { toast.error("Enter a valid email address"); return; }
-    addCustomer(formData);
-    toast.success(`Customer "${formData.name}" added successfully`);
+    const opId = crud.startOperation("create", `Adding "${formData.name}"…`);
+    try {
+      await addCustomer(formData);
+      crud.completeOperation(opId, `Customer "${formData.name}" added`);
+    } catch { crud.failOperation(opId, "Failed to add customer"); }
     setIsAddModalOpen(false);
     setFormData({ name: "", email: "", phone: "", address: "", country: "" });
   };
@@ -289,8 +294,11 @@ export function Customers() {
           <DialogFooter>
             <Button variant="outline" className="rounded-xl" onClick={() => setCustomerToDelete(null)}>Cancel</Button>
             <Button variant="destructive" className="rounded-xl" onClick={() => {
-              if (customerToDelete) deleteCustomer(customerToDelete.id);
-              toast.success(`Customer "${customerToDelete?.name}" removed`);
+              if (customerToDelete) {
+                const opId = crud.startOperation("delete", `Removing "${customerToDelete.name}"…`);
+                deleteCustomer(customerToDelete.id);
+                crud.completeOperation(opId, `Customer "${customerToDelete.name}" removed`);
+              }
               setCustomerToDelete(null);
             }}>Remove</Button>
           </DialogFooter>

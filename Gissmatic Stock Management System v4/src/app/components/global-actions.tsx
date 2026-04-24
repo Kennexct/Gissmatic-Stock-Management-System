@@ -13,6 +13,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "./ui/select";
 import { useAuth } from "./auth-context";
+import { useCrudProgress } from "./crud-progress";
 import { toast } from "sonner";
 import { Product, FrozenStock } from "../../lib/types";
 
@@ -93,6 +94,7 @@ export function GlobalActionsProvider({ children }: { children: React.ReactNode 
     updateProduct, addFrozenStock, releaseFrozenStock, frozenStocks,
     currentUser, addCategory, getUserPermissions,
   } = useAuth();
+  const crud = useCrudProgress();
 
   const perms = currentUser ? getUserPermissions(currentUser.id) : null;
   const isSuperAdmin = currentUser?.role === "superadmin";
@@ -243,9 +245,8 @@ export function GlobalActionsProvider({ children }: { children: React.ReactNode 
   };
 
   // ─── CONFIRM Add Stock ───
-  const executeAddStock = () => {
+  const executeAddStock = async () => {
     if (addIsNew) {
-      // Create new product
       if (!newProdForm.name || !newProdForm.category || !newProdForm.supplierName) {
         toast.error("Please fill in all product details"); return;
       }
@@ -256,28 +257,33 @@ export function GlobalActionsProvider({ children }: { children: React.ReactNode 
         toast.error("Enter a valid quantity"); return;
       }
       const qty = newProdForm.trackingType === "SN" ? addSnList.length : parseInt(addQty);
-      addProduct({ partNumber: addPn.trim(), name: newProdForm.name, category: newProdForm.category, trackingType: newProdForm.trackingType, quantity: qty, serialNumbers: newProdForm.trackingType === "SN" ? [...addSnList] : [], supplierName: newProdForm.supplierName });
-      addAuditLog({ userName: currentUser?.name || "Unknown", userEmail: currentUser?.email || "", action: "Created", itemName: newProdForm.name, changeDetail: newProdForm.trackingType === "SN" ? `+${addSnList.length} SNs` : `+${qty} QTY`, note: addNote });
-      toast.success(`"${newProdForm.name}" created with initial stock`);
+      const opId = crud.startOperation("create", `Creating "${newProdForm.name}"…`);
+      try {
+        await addProduct({ partNumber: addPn.trim(), name: newProdForm.name, category: newProdForm.category, trackingType: newProdForm.trackingType, quantity: qty, serialNumbers: newProdForm.trackingType === "SN" ? [...addSnList] : [], supplierName: newProdForm.supplierName });
+        await addAuditLog({ userName: currentUser?.name || "Unknown", userEmail: currentUser?.email || "", action: "Created", itemName: newProdForm.name, changeDetail: newProdForm.trackingType === "SN" ? `+${addSnList.length} SNs` : `+${qty} QTY`, note: addNote });
+        crud.completeOperation(opId, `"${newProdForm.name}" created`);
+      } catch { crud.failOperation(opId, "Failed to create product"); }
     } else {
-      // Add to existing product
       if (!addFoundProduct) return;
       if (addFoundProduct.trackingType === "SN") {
         if (addSnList.length === 0) { toast.error("Add at least one serial number"); return; }
         const dup = addSnList.find((sn) => addFoundProduct.serialNumbers.includes(sn));
         if (dup) { toast.error(`SN "${dup}" already exists`); return; }
-        updateProduct(addFoundProduct.id, {
-          serialNumbers: [...addFoundProduct.serialNumbers, ...addSnList],
-          quantity: addFoundProduct.quantity + addSnList.length,
-        });
-        addAuditLog({ userName: currentUser?.name || "Unknown", userEmail: currentUser?.email || "", action: "Stock-In", itemName: addFoundProduct.name, changeDetail: `+${addSnList.length} SN${addSnList.length > 1 ? "s" : ""}: ${addSnList.join(", ")}`, note: addNote });
-        toast.success(`+${addSnList.length} serial number(s) added to "${addFoundProduct.name}"`);
+        const opId = crud.startOperation("stock-in", `Adding ${addSnList.length} SN(s)…`);
+        try {
+          await updateProduct(addFoundProduct.id, { serialNumbers: [...addFoundProduct.serialNumbers, ...addSnList], quantity: addFoundProduct.quantity + addSnList.length });
+          await addAuditLog({ userName: currentUser?.name || "Unknown", userEmail: currentUser?.email || "", action: "Stock-In", itemName: addFoundProduct.name, changeDetail: `+${addSnList.length} SN${addSnList.length > 1 ? "s" : ""}: ${addSnList.join(", ")}`, note: addNote });
+          crud.completeOperation(opId, `+${addSnList.length} SN(s) added`);
+        } catch { crud.failOperation(opId, "Failed to add stock"); }
       } else {
         const qty = parseInt(addQty);
         if (isNaN(qty) || qty <= 0) { toast.error("Enter a valid quantity"); return; }
-        updateProduct(addFoundProduct.id, { quantity: addFoundProduct.quantity + qty });
-        addAuditLog({ userName: currentUser?.name || "Unknown", userEmail: currentUser?.email || "", action: "Stock-In", itemName: addFoundProduct.name, changeDetail: `+${qty} QTY`, note: addNote });
-        toast.success(`+${qty} units added to "${addFoundProduct.name}"`);
+        const opId = crud.startOperation("stock-in", `Adding ${qty} units…`);
+        try {
+          await updateProduct(addFoundProduct.id, { quantity: addFoundProduct.quantity + qty });
+          await addAuditLog({ userName: currentUser?.name || "Unknown", userEmail: currentUser?.email || "", action: "Stock-In", itemName: addFoundProduct.name, changeDetail: `+${qty} QTY`, note: addNote });
+          crud.completeOperation(opId, `+${qty} units added`);
+        } catch { crud.failOperation(opId, "Failed to add stock"); }
       }
     }
     setIsAddOpen(false);
@@ -285,82 +291,92 @@ export function GlobalActionsProvider({ children }: { children: React.ReactNode 
   };
 
   // ─── CONFIRM Out Stock ───
-  const executeOutStock = () => {
+  const executeOutStock = async () => {
     if (!outFoundProduct) return;
     const customer = outCustomerId && outCustomerId !== "none" ? customers.find((c) => c.id === outCustomerId) : undefined;
     if (outFoundProduct.trackingType === "SN") {
       if (outSelectedSns.length === 0) { toast.error("Select at least one serial number"); return; }
-      updateProduct(outFoundProduct.id, {
-        serialNumbers: outFoundProduct.serialNumbers.filter((sn) => !outSelectedSns.includes(sn)),
-        quantity: outFoundProduct.quantity - outSelectedSns.length,
-      });
-      addOutgoingSale({ customerId: customer?.id || "", customerName: customer?.name || "—", productId: outFoundProduct.id, productName: outFoundProduct.name, partNumber: outFoundProduct.partNumber, trackingType: "SN", serialNumbers: outSelectedSns, quantity: outSelectedSns.length, note: outNote });
-      addAuditLog({ userName: currentUser?.name || "Unknown", userEmail: currentUser?.email || "", action: "Stock-Out", itemName: outFoundProduct.name, changeDetail: `-${outSelectedSns.length} SN${outSelectedSns.length > 1 ? "s" : ""}: ${outSelectedSns.join(", ")}`, customerName: customer?.name, note: outNote });
-      toast.success(`${outSelectedSns.length} SN(s) moved out from "${outFoundProduct.name}"`);
+      const opId = crud.startOperation("stock-out", `Moving out ${outSelectedSns.length} SN(s)…`);
+      try {
+        await updateProduct(outFoundProduct.id, { serialNumbers: outFoundProduct.serialNumbers.filter((sn) => !outSelectedSns.includes(sn)), quantity: outFoundProduct.quantity - outSelectedSns.length });
+        await addOutgoingSale({ customerId: customer?.id || "", customerName: customer?.name || "—", productId: outFoundProduct.id, productName: outFoundProduct.name, partNumber: outFoundProduct.partNumber, trackingType: "SN", serialNumbers: outSelectedSns, quantity: outSelectedSns.length, note: outNote });
+        await addAuditLog({ userName: currentUser?.name || "Unknown", userEmail: currentUser?.email || "", action: "Stock-Out", itemName: outFoundProduct.name, changeDetail: `-${outSelectedSns.length} SN${outSelectedSns.length > 1 ? "s" : ""}: ${outSelectedSns.join(", ")}`, customerName: customer?.name, note: outNote });
+        crud.completeOperation(opId, `${outSelectedSns.length} SN(s) moved out`);
+      } catch { crud.failOperation(opId, "Failed to out stock"); }
     } else {
       const qty = parseInt(outQty);
       if (isNaN(qty) || qty <= 0) { toast.error("Enter a valid quantity"); return; }
       if (qty > outFoundProduct.quantity) { toast.error(`Only ${outFoundProduct.quantity} units available`); return; }
-      updateProduct(outFoundProduct.id, { quantity: outFoundProduct.quantity - qty });
-      addOutgoingSale({ customerId: customer?.id || "", customerName: customer?.name || "—", productId: outFoundProduct.id, productName: outFoundProduct.name, partNumber: outFoundProduct.partNumber, trackingType: "QTY", serialNumbers: [], quantity: qty, note: outNote });
-      addAuditLog({ userName: currentUser?.name || "Unknown", userEmail: currentUser?.email || "", action: "Stock-Out", itemName: outFoundProduct.name, changeDetail: `-${qty} QTY`, customerName: customer?.name, note: outNote });
-      toast.success(`${qty} unit(s) moved out from "${outFoundProduct.name}"`);
+      const opId = crud.startOperation("stock-out", `Moving out ${qty} units…`);
+      try {
+        await updateProduct(outFoundProduct.id, { quantity: outFoundProduct.quantity - qty });
+        await addOutgoingSale({ customerId: customer?.id || "", customerName: customer?.name || "—", productId: outFoundProduct.id, productName: outFoundProduct.name, partNumber: outFoundProduct.partNumber, trackingType: "QTY", serialNumbers: [], quantity: qty, note: outNote });
+        await addAuditLog({ userName: currentUser?.name || "Unknown", userEmail: currentUser?.email || "", action: "Stock-Out", itemName: outFoundProduct.name, changeDetail: `-${qty} QTY`, customerName: customer?.name, note: outNote });
+        crud.completeOperation(opId, `${qty} unit(s) moved out`);
+      } catch { crud.failOperation(opId, "Failed to out stock"); }
     }
     setIsOutOpen(false);
     resetOut();
   };
 
   // ─── CONFIRM Freeze Stock ───
-  const executeFreezeStock = () => {
+  const executeFreezeStock = async () => {
     if (!freezeFoundProduct) return;
     if (freezeFoundProduct.trackingType === "SN") {
       if (freezeSelectedSns.length === 0) { toast.error("Select at least one serial number"); return; }
-      updateProduct(freezeFoundProduct.id, {
-        serialNumbers: freezeFoundProduct.serialNumbers.filter((sn) => !freezeSelectedSns.includes(sn)),
-        quantity: freezeFoundProduct.quantity - freezeSelectedSns.length,
-      });
-      addFrozenStock({ productId: freezeFoundProduct.id, productName: freezeFoundProduct.name, partNumber: freezeFoundProduct.partNumber, trackingType: "SN", serialNumbers: freezeSelectedSns, quantity: freezeSelectedSns.length, frozenBy: currentUser?.name || "Unknown", frozenByEmail: currentUser?.email || "", customerName: freezeCustomer || undefined, note: freezeNote || undefined });
-      addAuditLog({ userName: currentUser?.name || "Unknown", userEmail: currentUser?.email || "", action: "Frozen", itemName: freezeFoundProduct.name, changeDetail: `Frozen ${freezeSelectedSns.length} SN${freezeSelectedSns.length > 1 ? "s" : ""}: ${freezeSelectedSns.join(", ")}`, customerName: freezeCustomer || undefined, note: freezeNote });
-      toast.success(`${freezeSelectedSns.length} SN(s) frozen from "${freezeFoundProduct.name}"`);
+      const opId = crud.startOperation("freeze", `Freezing ${freezeSelectedSns.length} SN(s)…`);
+      try {
+        await updateProduct(freezeFoundProduct.id, { serialNumbers: freezeFoundProduct.serialNumbers.filter((sn) => !freezeSelectedSns.includes(sn)), quantity: freezeFoundProduct.quantity - freezeSelectedSns.length });
+        await addFrozenStock({ productId: freezeFoundProduct.id, productName: freezeFoundProduct.name, partNumber: freezeFoundProduct.partNumber, trackingType: "SN", serialNumbers: freezeSelectedSns, quantity: freezeSelectedSns.length, frozenBy: currentUser?.name || "Unknown", frozenByEmail: currentUser?.email || "", customerName: freezeCustomer || undefined, note: freezeNote || undefined });
+        await addAuditLog({ userName: currentUser?.name || "Unknown", userEmail: currentUser?.email || "", action: "Frozen", itemName: freezeFoundProduct.name, changeDetail: `Frozen ${freezeSelectedSns.length} SN${freezeSelectedSns.length > 1 ? "s" : ""}: ${freezeSelectedSns.join(", ")}`, customerName: freezeCustomer || undefined, note: freezeNote });
+        crud.completeOperation(opId, `${freezeSelectedSns.length} SN(s) frozen`);
+      } catch { crud.failOperation(opId, "Failed to freeze stock"); }
     } else {
       const qty = parseInt(freezeQty);
       if (isNaN(qty) || qty <= 0) { toast.error("Enter a valid quantity"); return; }
       if (qty > freezeFoundProduct.quantity) { toast.error(`Only ${freezeFoundProduct.quantity} units available`); return; }
-      updateProduct(freezeFoundProduct.id, { quantity: freezeFoundProduct.quantity - qty });
-      addFrozenStock({ productId: freezeFoundProduct.id, productName: freezeFoundProduct.name, partNumber: freezeFoundProduct.partNumber, trackingType: "QTY", serialNumbers: [], quantity: qty, frozenBy: currentUser?.name || "Unknown", frozenByEmail: currentUser?.email || "", customerName: freezeCustomer || undefined, note: freezeNote || undefined });
-      addAuditLog({ userName: currentUser?.name || "Unknown", userEmail: currentUser?.email || "", action: "Frozen", itemName: freezeFoundProduct.name, changeDetail: `Frozen ${qty} QTY`, customerName: freezeCustomer || undefined, note: freezeNote });
-      toast.success(`${qty} unit(s) frozen from "${freezeFoundProduct.name}"`);
+      const opId = crud.startOperation("freeze", `Freezing ${qty} units…`);
+      try {
+        await updateProduct(freezeFoundProduct.id, { quantity: freezeFoundProduct.quantity - qty });
+        await addFrozenStock({ productId: freezeFoundProduct.id, productName: freezeFoundProduct.name, partNumber: freezeFoundProduct.partNumber, trackingType: "QTY", serialNumbers: [], quantity: qty, frozenBy: currentUser?.name || "Unknown", frozenByEmail: currentUser?.email || "", customerName: freezeCustomer || undefined, note: freezeNote || undefined });
+        await addAuditLog({ userName: currentUser?.name || "Unknown", userEmail: currentUser?.email || "", action: "Frozen", itemName: freezeFoundProduct.name, changeDetail: `Frozen ${qty} QTY`, customerName: freezeCustomer || undefined, note: freezeNote });
+        crud.completeOperation(opId, `${qty} unit(s) frozen`);
+      } catch { crud.failOperation(opId, "Failed to freeze stock"); }
     }
     setIsFreezeOpen(false);
     resetFreeze();
   };
 
   // ─── Release frozen stock ───
-  const executeRelease = () => {
+  const executeRelease = async () => {
     if (!releasingFrozen || !releaseAction) return;
     const action = releaseAction;
     const frozen = releasingFrozen;
-    if (action === "confirm") {
-      // Confirm as stock-out
-      addOutgoingSale({ customerId: "", customerName: frozen.customerName || "—", productId: frozen.productId, productName: frozen.productName, partNumber: frozen.partNumber, trackingType: frozen.trackingType, serialNumbers: frozen.serialNumbers, quantity: frozen.trackingType === "SN" ? frozen.serialNumbers.length : frozen.quantity, note: frozen.note || "" });
-      addAuditLog({ userName: currentUser?.name || "Unknown", userEmail: currentUser?.email || "", action: "Released", itemName: frozen.productName, changeDetail: frozen.trackingType === "SN" ? `-${frozen.serialNumbers.length} SNs (released from freeze)` : `-${frozen.quantity} QTY (released from freeze)`, customerName: frozen.customerName, note: frozen.note });
-      toast.success(`Stock confirmed out from frozen: "${frozen.productName}"`);
-    } else {
-      // Cancel — return to stock
-      addAuditLog({ userName: currentUser?.name || "Unknown", userEmail: currentUser?.email || "", action: "Cancelled", itemName: frozen.productName, changeDetail: frozen.trackingType === "SN" ? `Returned ${frozen.serialNumbers.length} SNs to stock` : `Returned ${frozen.quantity} QTY to stock`, note: frozen.note });
-      toast.success(`Frozen stock cancelled — returned to "${frozen.productName}"`);
-    }
-    releaseFrozenStock(frozen.id, action);
+    const opId = crud.startOperation("release", action === "confirm" ? "Confirming out…" : "Returning stock…");
+    try {
+      if (action === "confirm") {
+        await addOutgoingSale({ customerId: "", customerName: frozen.customerName || "—", productId: frozen.productId, productName: frozen.productName, partNumber: frozen.partNumber, trackingType: frozen.trackingType, serialNumbers: frozen.serialNumbers, quantity: frozen.trackingType === "SN" ? frozen.serialNumbers.length : frozen.quantity, note: frozen.note || "" });
+        await addAuditLog({ userName: currentUser?.name || "Unknown", userEmail: currentUser?.email || "", action: "Released", itemName: frozen.productName, changeDetail: frozen.trackingType === "SN" ? `-${frozen.serialNumbers.length} SNs (released from freeze)` : `-${frozen.quantity} QTY (released from freeze)`, customerName: frozen.customerName, note: frozen.note });
+        crud.completeOperation(opId, `Stock confirmed out`);
+      } else {
+        await addAuditLog({ userName: currentUser?.name || "Unknown", userEmail: currentUser?.email || "", action: "Cancelled", itemName: frozen.productName, changeDetail: frozen.trackingType === "SN" ? `Returned ${frozen.serialNumbers.length} SNs to stock` : `Returned ${frozen.quantity} QTY to stock`, note: frozen.note });
+        crud.completeOperation(opId, `Stock returned to inventory`);
+      }
+      await releaseFrozenStock(frozen.id, action);
+    } catch { crud.failOperation(opId, "Release failed"); }
     setReleasingFrozen(null);
     setReleaseAction(null);
   };
 
 
 
-  const handleAddCustomer = () => {
+  const handleAddCustomer = async () => {
     if (!newCustomer.name || !newCustomer.email || !newCustomer.phone) { toast.error("Name, email and phone required"); return; }
-    addCustomer(newCustomer);
-    toast.success(`Customer "${newCustomer.name}" added`);
+    const opId = crud.startOperation("create", `Adding "${newCustomer.name}"…`);
+    try {
+      await addCustomer(newCustomer);
+      crud.completeOperation(opId, `Customer "${newCustomer.name}" added`);
+    } catch { crud.failOperation(opId, "Failed to add customer"); }
     setNewCustomer({ name: "", email: "", phone: "", address: "", country: "" });
     setIsAddCustomerOpen(false);
   };

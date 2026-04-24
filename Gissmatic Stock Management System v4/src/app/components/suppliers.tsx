@@ -8,14 +8,49 @@ import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from "./ui/dialog";
 import { useAuth } from "./auth-context";
+import { useCrudProgress } from "./crud-progress";
 import { Supplier } from "../../lib/types";
 import { toast } from "sonner";
 
 type SupplierForm = { name: string; phone: string; email: string; address: string; country: string };
 const emptyForm: SupplierForm = { name: "", phone: "", email: "", address: "", country: "" };
 
+const SUPPLIER_FIELDS = [
+  { id: "s-name", label: "Supplier Name *", key: "name", placeholder: "ABC Distributors Inc", type: "text" },
+  { id: "s-phone", label: "Phone Number *", key: "phone", placeholder: "+1-555-0123", type: "tel" },
+  { id: "s-email", label: "Email Address *", key: "email", placeholder: "contact@supplier.com", type: "email" },
+  { id: "s-addr", label: "Address", key: "address", placeholder: "123 Main Street, City", type: "text" },
+  { id: "s-country", label: "Country", key: "country", placeholder: "United States", type: "text" },
+];
+
+// ── Defined OUTSIDE Suppliers to prevent remounting on every render ──
+function SupplierFormFields({ data, onChange, idPrefix = "" }: {
+  data: SupplierForm;
+  onChange: (d: SupplierForm) => void;
+  idPrefix?: string;
+}) {
+  return (
+    <div className="space-y-4 py-3">
+      {SUPPLIER_FIELDS.map((f) => (
+        <div key={f.key} className="space-y-1.5">
+          <Label htmlFor={`${idPrefix}${f.id}`}>{f.label}</Label>
+          <Input
+            id={`${idPrefix}${f.id}`}
+            type={f.type}
+            placeholder={f.placeholder}
+            value={(data as any)[f.key]}
+            onChange={(e) => onChange({ ...data, [f.key]: e.target.value })}
+            className="rounded-xl"
+          />
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export function Suppliers() {
   const { suppliers, addSupplier, updateSupplier } = useAuth();
+  const crud = useCrudProgress();
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [editingSupplier, setEditingSupplier] = useState<Supplier | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
@@ -37,10 +72,13 @@ export function Suppliers() {
     return true;
   };
 
-  const handleAddSupplier = () => {
+  const handleAddSupplier = async () => {
     if (!validateForm(formData)) return;
-    addSupplier(formData);
-    toast.success(`Supplier "${formData.name}" added successfully`);
+    const opId = crud.startOperation("create", `Adding "${formData.name}"…`);
+    try {
+      await addSupplier(formData);
+      crud.completeOperation(opId, `Supplier "${formData.name}" added`);
+    } catch { crud.failOperation(opId, "Failed to add supplier"); }
     setIsAddModalOpen(false);
     setFormData(emptyForm);
   };
@@ -56,47 +94,20 @@ export function Suppliers() {
     });
   };
 
-  const handleEditSupplier = () => {
+  const handleEditSupplier = async () => {
     if (!editingSupplier) return;
     if (!validateForm(editForm)) return;
-    updateSupplier(editingSupplier.id, editForm);
-    toast.success(`Supplier "${editForm.name}" updated successfully`);
+    const opId = crud.startOperation("update", `Updating "${editForm.name}"…`);
+    try {
+      await updateSupplier(editingSupplier.id, editForm);
+      crud.completeOperation(opId, `Supplier "${editForm.name}" updated`);
+    } catch { crud.failOperation(opId, "Failed to update supplier"); }
     setEditingSupplier(null);
     setEditForm(emptyForm);
   };
 
   const formatDate = (d: string) =>
     new Date(d).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" });
-
-  const FormFields = ({
-    data,
-    onChange,
-  }: {
-    data: SupplierForm;
-    onChange: (d: SupplierForm) => void;
-  }) => (
-    <div className="space-y-4 py-3">
-      {[
-        { id: "s-name", label: "Supplier Name *", key: "name", placeholder: "ABC Distributors Inc", type: "text" },
-        { id: "s-phone", label: "Phone Number *", key: "phone", placeholder: "+1-555-0123", type: "tel" },
-        { id: "s-email", label: "Email Address *", key: "email", placeholder: "contact@supplier.com", type: "email" },
-        { id: "s-addr", label: "Address", key: "address", placeholder: "123 Main Street, City", type: "text" },
-        { id: "s-country", label: "Country", key: "country", placeholder: "United States", type: "text" },
-      ].map((f) => (
-        <div key={f.id} className="space-y-1.5">
-          <Label htmlFor={f.id}>{f.label}</Label>
-          <Input
-            id={f.id}
-            type={f.type}
-            placeholder={f.placeholder}
-            value={(data as any)[f.key]}
-            onChange={(e) => onChange({ ...data, [f.key]: e.target.value })}
-            className="rounded-xl"
-          />
-        </div>
-      ))}
-    </div>
-  );
 
   return (
     <div className="space-y-6">
@@ -202,7 +213,7 @@ export function Suppliers() {
             <DialogTitle>Add New Supplier</DialogTitle>
             <DialogDescription>Enter supplier details to add to your system</DialogDescription>
           </DialogHeader>
-          <FormFields data={formData} onChange={setFormData} />
+          <SupplierFormFields data={formData} onChange={setFormData} idPrefix="add-" />
           <DialogFooter>
             <Button variant="outline" className="rounded-xl" onClick={() => { setIsAddModalOpen(false); setFormData(emptyForm); }}>
               Cancel
@@ -226,7 +237,7 @@ export function Suppliers() {
             </DialogTitle>
             <DialogDescription>Update supplier information for <span className="font-semibold">{editingSupplier?.name}</span></DialogDescription>
           </DialogHeader>
-          <FormFields data={editForm} onChange={setEditForm} />
+          <SupplierFormFields data={editForm} onChange={setEditForm} idPrefix="edit-" />
           <DialogFooter>
             <Button variant="outline" className="rounded-xl" onClick={() => { setEditingSupplier(null); setEditForm(emptyForm); }}>
               Cancel

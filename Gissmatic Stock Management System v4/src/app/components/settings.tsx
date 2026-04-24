@@ -14,6 +14,7 @@ import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from "./ui/dialog";
 import { useAuth } from "./auth-context";
+import { useCrudProgress } from "./crud-progress";
 import { UserRole, User as UserType, UserPermissions } from "../../lib/types";
 import { toast } from "sonner";
 import { supabase } from "../../lib/supabase";
@@ -223,6 +224,7 @@ function StaffPermissionsPanel({ user, permissions, onSave, onDelete }: {
 
 export function Settings() {
   const { currentUser, users, addUser, deleteUser, getUserPermissions, updateUserPermissions, updateProfile, updatePassword, factoryReset } = useAuth();
+  const crud = useCrudProgress();
   const [activeTab, setActiveTab] = useState<SettingsTab>("profile");
   const [notifLowStock, setNotifLowStock] = useState(true);
   const [notifEmail, setNotifEmail] = useState(false);
@@ -310,10 +312,11 @@ export function Settings() {
       return;
     }
     setIsSavingProfile(true);
+    const opId = crud.startOperation("update", "Updating profile…");
     const { success, error } = await updateProfile(profileName.trim(), profileEmail.trim());
     setIsSavingProfile(false);
-    if (success) toast.success("Profile updated successfully");
-    else toast.error(error || "Failed to update profile");
+    if (success) crud.completeOperation(opId, "Profile updated");
+    else { crud.failOperation(opId, error || "Failed to update"); }
   };
 
   const handleUpdatePassword = async () => {
@@ -330,14 +333,15 @@ export function Settings() {
       return;
     }
     setIsSavingPass(true);
+    const opId = crud.startOperation("update", "Changing password…");
     const { success, error } = await updatePassword(newPass);
     setIsSavingPass(false);
     if (success) {
-      toast.success("Password updated successfully");
+      crud.completeOperation(opId, "Password updated");
       setNewPass("");
       setConfirmPass("");
     } else {
-      toast.error(error || "Failed to update password");
+      crud.failOperation(opId, error || "Failed to update");
     }
   };
 
@@ -347,22 +351,24 @@ export function Settings() {
     if (!emailRegex.test(staffForm.email)) { toast.error("Enter a valid email"); return; }
     
     setIsCreating(true);
+    const opId = crud.startOperation("create", `Creating "${staffForm.name}"…`);
     const result = await addUser(staffForm);
     setIsCreating(false);
 
     if (result.success) {
-      toast.success(`Staff member "${staffForm.name}" created`);
+      crud.completeOperation(opId, `Staff "${staffForm.name}" created`);
       setIsCreateModalOpen(false);
       setStaffForm({ name: "", email: "", role: "viewer" });
     } else {
-      toast.error(result.error || "Failed to create staff member");
+      crud.failOperation(opId, result.error || "Failed to create");
     }
   };
 
   const handleDeleteUser = () => {
     if (!userToDelete) return;
+    const opId = crud.startOperation("delete", `Removing "${userToDelete.name}"…`);
     deleteUser(userToDelete.id);
-    toast.success(`"${userToDelete.name}" removed`);
+    crud.completeOperation(opId, `"${userToDelete.name}" removed`);
     setUserToDelete(null);
   };
 
@@ -635,11 +641,12 @@ export function Settings() {
                         "Are you absolutely certain? This will wipe the active Supabase transactional tables. This cannot be undone.",
                         "Yes, Wipe Database",
                         async () => {
+                          const opId = crud.startOperation("delete", "Wiping database…");
                           const { success, error } = await factoryReset();
                           if (success) {
-                            toast.success("Database has been completely wiped.");
+                            crud.completeOperation(opId, "Database wiped");
                           } else {
-                            toast.error("Wipe failed: " + error);
+                            crud.failOperation(opId, "Wipe failed: " + error);
                           }
                         }
                       );
