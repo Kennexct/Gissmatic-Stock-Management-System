@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import {
   Settings as SettingsIcon, User, Bell, Shield,
-  Users, UserPlus, Trash2, AlertTriangle, ChevronDown, ChevronUp, Mail, Search,
+  Users, UserPlus, Trash2, AlertTriangle, ChevronDown, ChevronUp, Mail, Search, Database
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
 import { Label } from "./ui/label";
@@ -16,8 +16,9 @@ import {
 import { useAuth } from "./auth-context";
 import { UserRole, User as UserType, UserPermissions } from "../../lib/types";
 import { toast } from "sonner";
+import { supabase } from "../../lib/supabase";
 
-type SettingsTab = "profile" | "security" | "notifications" | "staff";
+type SettingsTab = "profile" | "security" | "notifications" | "staff" | "data_inventory";
 
 const PERMISSION_GROUPS = [
   {
@@ -208,7 +209,7 @@ function StaffPermissionsPanel({ user, permissions, onUpdate, onDelete, confirmA
 }
 
 export function Settings() {
-  const { currentUser, users, addUser, deleteUser, getUserPermissions, updateUserPermissions, updateProfile, updatePassword } = useAuth();
+  const { currentUser, users, addUser, deleteUser, getUserPermissions, updateUserPermissions, updateProfile, updatePassword, factoryReset } = useAuth();
   const [activeTab, setActiveTab] = useState<SettingsTab>("profile");
   const [notifLowStock, setNotifLowStock] = useState(true);
   const [notifEmail, setNotifEmail] = useState(false);
@@ -226,6 +227,41 @@ export function Settings() {
 
   const requestConfirm = (title: string, desc: string, action: string, onConfirm: () => void) => {
     setConfirmConfig({ isOpen: true, title, desc, action, onConfirm });
+  };
+
+  // Data Inventory Security State
+  const [isDataInventoryUnlocked, setIsDataInventoryUnlocked] = useState(false);
+  const [dataInventoryPass, setDataInventoryPass] = useState("");
+  const [unlockError, setUnlockError] = useState("");
+  const [isUnlocking, setIsUnlocking] = useState(false);
+  const [showDataUnlockModal, setShowDataUnlockModal] = useState(false);
+
+  const handleTabClick = (tabId: SettingsTab) => {
+    if (tabId === "data_inventory" && !isDataInventoryUnlocked) {
+      setShowDataUnlockModal(true);
+      return;
+    }
+    setActiveTab(tabId);
+  };
+
+  const handleUnlockDataInventory = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setUnlockError("");
+    if (!currentUser?.email) return;
+    
+    setIsUnlocking(true);
+    const { data, error } = await supabase.auth.signInWithPassword({ email: currentUser.email, password: dataInventoryPass });
+    setIsUnlocking(false);
+
+    if (error || !data.user) {
+      setUnlockError("Incorrect password");
+    } else {
+      setIsDataInventoryUnlocked(true);
+      setShowDataUnlockModal(false);
+      setActiveTab("data_inventory");
+      setDataInventoryPass("");
+      toast.success("Data Inventory unlocked");
+    }
   };
 
   // Profile Form State
@@ -312,6 +348,10 @@ export function Settings() {
     { id: "notifications", label: "Notifications", icon: Bell },
     { id: "staff", label: "Staff & Access", icon: Users },
   ];
+  
+  if (currentUser?.role === 'superadmin') {
+    tabs.push({ id: "data_inventory", label: "Data Inventory", icon: Database });
+  }
 
   return (
     <div className="space-y-6">
@@ -331,7 +371,7 @@ export function Settings() {
           return (
             <button
               key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
+              onClick={() => handleTabClick(tab.id)}
               className={`flex items-center gap-2 px-3 sm:px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors whitespace-nowrap ${isActive ? "border-[#16c60c] text-[#0a1565]" : "border-transparent text-slate-500 hover:text-slate-700"}`}
             >
               <Icon className="w-4 h-4" />
@@ -543,6 +583,55 @@ export function Settings() {
             </div>
           </div>
         )}
+
+        {/* Data Inventory Tab */}
+        {activeTab === "data_inventory" && currentUser?.role === 'superadmin' && isDataInventoryUnlocked && (
+          <div className="space-y-5">
+            <Card className="rounded-2xl border-red-200 shadow-sm bg-red-50/30 overflow-hidden">
+              <div className="h-1 bg-red-500 w-full" />
+              <CardHeader className="pb-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-red-100 flex items-center justify-center shrink-0">
+                    <AlertTriangle className="h-5 w-5 text-red-600" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-base text-red-700">Danger Zone: Database Reset</CardTitle>
+                    <CardDescription className="mt-0.5 text-red-600/80">Permanent and irreversible actions</CardDescription>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="p-4 bg-white rounded-xl border border-red-100">
+                  <p className="font-semibold text-slate-800 mb-1">Erase active inventory database</p>
+                  <p className="text-sm text-slate-500 mb-4">
+                    This will permanently empty all Products, Customers, Suppliers, Transactions, and Audit Logs from the cloud database and your local browser. User accounts and login credentials will be retained so you can log back in.
+                  </p>
+                  <Button
+                    variant="destructive"
+                    className="rounded-xl w-full sm:w-auto"
+                    onClick={() => {
+                      requestConfirm(
+                        "Absolute Final Warning",
+                        "Are you absolutely certain? This will wipe the active Supabase transactional tables. This cannot be undone.",
+                        "Yes, Wipe Database",
+                        async () => {
+                          const { success, error } = await factoryReset();
+                          if (success) {
+                            toast.success("Database has been completely wiped.");
+                          } else {
+                            toast.error("Wipe failed: " + error);
+                          }
+                        }
+                      );
+                    }}
+                  >
+                    <Trash2 className="w-4 h-4 mr-2" /> Delete Inventory Data
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
       </div>
 
       {/* Create Staff Modal */}
@@ -619,6 +708,41 @@ export function Settings() {
               {confirmConfig?.action}
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Data Inventory Password Challenge */}
+      <Dialog open={showDataUnlockModal} onOpenChange={setShowDataUnlockModal}>
+        <DialogContent className="max-w-sm rounded-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-slate-900">
+              <Shield className="h-5 w-5 text-amber-500" /> Security Verification
+            </DialogTitle>
+            <DialogDescription>
+              Please enter your Master Admin password to safely access the Data Inventory settings.
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleUnlockDataInventory} className="space-y-4 py-2">
+            <div className="space-y-1.5">
+              <Label htmlFor="unlock-pass">Password</Label>
+              <Input
+                id="unlock-pass"
+                type="password"
+                autoFocus
+                placeholder="••••••••"
+                value={dataInventoryPass}
+                onChange={(e) => { setDataInventoryPass(e.target.value); setUnlockError(""); }}
+                className="rounded-xl"
+              />
+            </div>
+            {unlockError && <p className="text-sm text-red-600">{unlockError}</p>}
+            <DialogFooter className="mt-6">
+              <Button type="button" variant="outline" className="rounded-xl" onClick={() => { setShowDataUnlockModal(false); setDataInventoryPass(""); setUnlockError(""); }}>Cancel</Button>
+              <Button type="submit" disabled={isUnlocking} className="rounded-xl text-white" style={{ background: "linear-gradient(135deg, #0a1565, #1229b3)" }}>
+                {isUnlocking ? "Verifying..." : "Unlock Access"}
+              </Button>
+            </DialogFooter>
+          </form>
         </DialogContent>
       </Dialog>
     </div>

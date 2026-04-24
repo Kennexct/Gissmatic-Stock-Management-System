@@ -266,33 +266,7 @@ export function Login() {
             </form>
           )}
 
-          {/* Demo accounts */}
-          <div className="space-y-3">
-            <div className="flex items-center gap-3">
-              <div className="flex-1 h-px bg-slate-200" />
-              <span className="text-slate-400 text-sm">Demo accounts</span>
-              <div className="flex-1 h-px bg-slate-200" />
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              {[
-                { name: "Superadmin", email: "admin@stockms.com", bg: "bg-[#0a1565]", text: "text-white" },
-                { name: "Manager", email: "john@stockms.com", bg: "bg-[#0d9904]", text: "text-white" },
-                { name: "Clerk", email: "sarah@stockms.com", bg: "bg-emerald-50", text: "text-emerald-700", border: "border border-emerald-200" },
-                { name: "Viewer", email: "mike@stockms.com", bg: "bg-slate-100", text: "text-slate-600" },
-              ].map((acc) => (
-                <button
-                  key={acc.email}
-                  type="button"
-                  onClick={() => quickLogin(acc.email)}
-                  className={`text-left p-3 rounded-xl text-sm transition-all hover:opacity-90 ${acc.bg} ${acc.text} ${acc.border || ""}`}
-                >
-                  <p className="font-semibold">{acc.name}</p>
-                  <p className="text-xs opacity-70 truncate">{acc.email}</p>
-                </button>
-              ))}
-            </div>
-            <p className="text-center text-slate-400 text-xs">For the real backend, you must <button onClick={seedMasterAdmin} className="underline text-blue-500 font-semibold cursor-pointer">initialize the Master Admin</button> first before clicking Superadmin.</p>
-          </div>
+
         </div>
       </div>
     </div>

@@ -35,6 +35,7 @@ interface AuthContextType {
   setCurrency: (currency: string) => void;
   getUserPermissions: (userId: string) => UserPermissions;
   updateUserPermissions: (userId: string, updates: Partial<UserPermissions>) => void;
+  factoryReset: () => Promise<{ success: boolean; error?: string }>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -297,12 +298,47 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const updateUserPermissions = (userId: string, updates: Partial<UserPermissions>) => {
-    const existing = permissions.find((p) => p.userId === userId);
-    if (existing) {
-      setPermissions(permissions.map((p) => p.userId === userId ? { ...p, ...updates } : p));
-    } else {
-      const base = getUserPermissions(userId);
-      setPermissions([...permissions, { ...base, ...updates }]);
+    setPermissions(prev => {
+      const existing = prev.find(p => p.userId === userId);
+      if (existing) {
+        return prev.map(p => p.userId === userId ? { ...p, ...updates } : p);
+      }
+      return [...prev, { userId, ...updates } as UserPermissions];
+    });
+  };
+
+  const factoryReset = async (): Promise<{ success: boolean; error?: string }> => {
+    if (currentUser?.role !== 'superadmin') return { success: false, error: "Unauthorized" };
+
+    try {
+      // Wipe Supabase Tables (ignoring users/permissions to keep login working)
+      // We use .not('id', 'is', null) to match all rows
+      await Promise.all([
+        supabase.from('products').delete().not('id', 'is', null),
+        supabase.from('audit_logs').delete().not('id', 'is', null),
+        supabase.from('suppliers').delete().not('id', 'is', null),
+        supabase.from('customers').delete().not('id', 'is', null),
+        supabase.from('outgoing_sales').delete().not('id', 'is', null),
+        supabase.from('frozen_stocks').delete().not('id', 'is', null)
+      ]);
+
+      // Wipe Local State
+      setProducts([]);
+      setAuditLogs([]);
+      setSuppliers([]);
+      setCustomers([]);
+      setOutgoingSales([]);
+      setFrozenStocks([]);
+      setCategories(defaultCategories);
+
+      // Wipe LocalStorage
+      const keysToWipe = ["products_v2", "auditLogs_v2", "suppliers", "customers", "outgoingSales_v2", "frozenStocks"];
+      keysToWipe.forEach((k) => localStorage.removeItem(k));
+      
+      return { success: true };
+    } catch (err: any) {
+      console.error("Factory Reset Error:", err);
+      return { success: false, error: err.message || "Failed to wipe database" };
     }
   };
 
@@ -311,8 +347,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       currentUser, users, products, auditLogs, suppliers, customers, outgoingSales, frozenStocks,
       permissions, categories, currency, login, logout, updateProfile, updatePassword, addUser, deleteUser,
       addProduct, updateProduct, addAuditLog, addSupplier, updateSupplier, addCustomer, deleteCustomer,
-      addOutgoingSale, addFrozenStock, releaseFrozenStock, addCategory, setCurrency,
-      getUserPermissions, updateUserPermissions,
+      addOutgoingSale, addFrozenStock, releaseFrozenStock, addCategory, setCurrency: setCurrencyState,
+      getUserPermissions, updateUserPermissions, factoryReset
     }}>
       {children}
     </AuthContext.Provider>
