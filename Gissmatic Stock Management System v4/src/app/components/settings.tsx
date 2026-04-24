@@ -384,7 +384,7 @@ export function Settings() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 pt-14 lg:pt-0">
       <div>
         <h1 className="flex items-center gap-2" style={{ color: "#0a1565" }}>
           <SettingsIcon className="h-7 w-7" style={{ color: "#16c60c" }} />
@@ -448,14 +448,16 @@ export function Settings() {
                   className="rounded-xl bg-slate-50 text-slate-500"
                 />
               </div>
-              <Button
-                disabled={isSavingProfile}
-                className="rounded-xl text-white"
-                style={{ background: "linear-gradient(135deg, #0a1565, #1229b3)" }}
-                onClick={() => requestConfirm("Update Profile", "Are you sure you want to permanently save changes to your profile name and email address?", "Save Profile", handleUpdateProfile)}
-              >
-                {isSavingProfile ? "Saving..." : "Save Changes"}
-              </Button>
+              <div className="flex justify-end pt-2">
+                <Button
+                  disabled={isSavingProfile}
+                  className="rounded-xl text-white px-6"
+                  style={{ background: "linear-gradient(135deg, #0a1565, #1229b3)" }}
+                  onClick={() => requestConfirm("Update Profile", "Are you sure you want to permanently save changes to your profile name and email address?", "Save Profile", handleUpdateProfile)}
+                >
+                  {isSavingProfile ? "Saving..." : "Save Changes"}
+                </Button>
+              </div>
             </CardContent>
           </Card>
         )}
@@ -485,9 +487,16 @@ export function Settings() {
                   <Input id="confirm-pass" type="password" value={confirmPass} onChange={(e) => setConfirmPass(e.target.value)} placeholder="••••••••" className="rounded-xl" />
                 </div>
               </div>
-              <Button disabled={isSavingPass} variant="outline" className="rounded-xl" onClick={() => requestConfirm("Update Password", "Are you sure you want to change your password? Doing so might require you to login again.", "Change Password", handleUpdatePassword)}>
-                {isSavingPass ? "Updating..." : "Update Password"}
-              </Button>
+              <div className="flex justify-end pt-2">
+                <Button 
+                  disabled={isSavingPass} 
+                  className="rounded-xl text-white px-6" 
+                  style={{ background: "linear-gradient(135deg, #0a1565, #1229b3)" }}
+                  onClick={() => requestConfirm("Update Password", "Are you sure you want to change your password? Doing so might require you to login again.", "Change Password", handleUpdatePassword)}
+                >
+                  {isSavingPass ? "Updating..." : "Update Password"}
+                </Button>
+              </div>
             </CardContent>
           </Card>
         )}

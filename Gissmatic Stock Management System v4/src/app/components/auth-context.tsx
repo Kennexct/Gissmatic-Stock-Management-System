@@ -191,6 +191,35 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           createdAt: db.created_at,
         })));
       }
+      // ── Users (Staff) ──
+      const { data: userData } = await supabase.from('users').select('*');
+      if (userData && userData.length > 0) {
+        setUsers(userData.map((db: any) => ({
+          id: db.id, name: db.name, email: db.email, role: db.role || 'viewer', createdAt: db.created_at,
+        })));
+      }
+
+      // ── User Permissions ──
+      const { data: permData } = await supabase.from('user_permissions').select('*');
+      if (permData && permData.length > 0) {
+        setPermissions(permData.map((db: any) => ({
+          userId: db.user_id,
+          showQuickAddStock: db.show_quick_add_stock ?? false,
+          showQuickOutStock: db.show_quick_out_stock ?? false,
+          canAccessDashboard: db.can_access_dashboard ?? false,
+          canViewInventory: db.can_view_inventory ?? false,
+          canAddStock: db.can_add_stock ?? false,
+          canStockIn: db.can_stock_in ?? false,
+          canOutStock: db.can_out_stock ?? false,
+          canFreezeStock: db.can_freeze_stock ?? false,
+          canViewCustomers: db.can_view_customers ?? false,
+          canManageCustomers: db.can_manage_customers ?? false,
+          canViewSuppliers: db.can_view_suppliers ?? false,
+          canManageSuppliers: db.can_manage_suppliers ?? false,
+          canViewReports: db.can_view_reports ?? false,
+          canExportReports: db.can_export_reports ?? false,
+        })));
+      }
     };
     fetchAllFromSupabase();
   }, []);
@@ -244,9 +273,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'customers' }, () => debounced('customers', refetch.customers))
       .subscribe();
 
+    // Auto-refresh polling every 30s as realtime fallback
+    const pollInterval = setInterval(() => {
+      refetch.products();
+      refetch.auditLogs();
+      refetch.sales();
+      refetch.frozen();
+      refetch.suppliers();
+      refetch.customers();
+    }, 30000);
+
     return () => {
       supabase.removeChannel(channel);
       Object.values(timers).forEach(clearTimeout);
+      clearInterval(pollInterval);
     };
   }, []);
 
@@ -495,7 +535,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const addCustomer = async (customerData: Omit<Customer, "id" | "createdAt">) => {
+  const addCustomer = async (customerData: Omit<Customer, "id" | "createdAt">): Promise<string> => {
     const createdAt = new Date().toISOString();
     const tempId = `C${Date.now()}`;
     const newCustomer: Customer = { ...customerData, id: tempId, createdAt };
@@ -508,7 +548,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }).select().single();
     if (data?.id) {
       setCustomers(prev => prev.map(c => c.id === tempId ? { ...c, id: data.id } : c));
+      return data.id;
     }
+    return tempId;
   };
 
   const deleteCustomer = async (id: string) => {

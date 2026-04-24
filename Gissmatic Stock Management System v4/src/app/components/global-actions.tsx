@@ -129,6 +129,7 @@ export function GlobalActionsProvider({ children }: { children: React.ReactNode 
   const [outCustomerId, setOutCustomerId] = useState("");
   const [outNote, setOutNote] = useState("");
   const [isAddCustomerOpen, setIsAddCustomerOpen] = useState(false);
+  const [addCustomerSource, setAddCustomerSource] = useState<"out" | "freeze" | "release" | null>(null);
   const [newCustomer, setNewCustomer] = useState({ name: "", email: "", phone: "", address: "", country: "" });
   const [confirmOutOpen, setConfirmOutOpen] = useState(false);
 
@@ -139,7 +140,7 @@ export function GlobalActionsProvider({ children }: { children: React.ReactNode 
   const [freezeSelectedSns, setFreezeSelectedSns] = useState<string[]>([]);
   const [freezeSnInput, setFreezeSnInput] = useState("");
   const [freezeQty, setFreezeQty] = useState("");
-  const [freezeCustomer, setFreezeCustomer] = useState("");
+  const [freezeCustomerId, setFreezeCustomerId] = useState("");
   const [freezeNote, setFreezeNote] = useState("");
   const [confirmFreezeOpen, setConfirmFreezeOpen] = useState(false);
 
@@ -147,6 +148,8 @@ export function GlobalActionsProvider({ children }: { children: React.ReactNode 
   const [isFreezeListOpen, setIsFreezeListOpen] = useState(false);
   const [releasingFrozen, setReleasingFrozen] = useState<FrozenStock | null>(null);
   const [releaseAction, setReleaseAction] = useState<"confirm" | "cancel" | null>(null);
+  const [releaseCustomerId, setReleaseCustomerId] = useState("");
+  const [releaseNote, setReleaseNote] = useState("");
 
   // ─── Part number lookup helpers ───
   const lookupProduct = (pn: string) =>
@@ -181,7 +184,7 @@ export function GlobalActionsProvider({ children }: { children: React.ReactNode 
   // ─── Reset helpers ───
   const resetAdd = () => { setAddPn(""); setAddFoundProduct(null); setAddSnInput(""); setAddSnList([]); setAddQty(""); setAddNote(""); setAddIsNew(false); setNewProdForm({ name: "", category: "", trackingType: "QTY", supplierName: "" }); };
   const resetOut = () => { setOutPn(""); setOutFoundProduct(null); setOutSelectedSns([]); setOutSnInput(""); setOutQty(""); setOutCustomerId(""); setOutNote(""); };
-  const resetFreeze = () => { setFreezePn(""); setFreezeFoundProduct(null); setFreezeSelectedSns([]); setFreezeSnInput(""); setFreezeQty(""); setFreezeCustomer(""); setFreezeNote(""); };
+  const resetFreeze = () => { setFreezePn(""); setFreezeFoundProduct(null); setFreezeSelectedSns([]); setFreezeSnInput(""); setFreezeQty(""); setFreezeCustomerId(""); setFreezeNote(""); };
 
   // ─── Open handlers ───
   const openAddStock = () => { resetAdd(); setIsAddOpen(true); };
@@ -327,8 +330,9 @@ export function GlobalActionsProvider({ children }: { children: React.ReactNode 
       const opId = crud.startOperation("freeze", `Freezing ${freezeSelectedSns.length} SN(s)…`);
       try {
         await updateProduct(freezeFoundProduct.id, { serialNumbers: freezeFoundProduct.serialNumbers.filter((sn) => !freezeSelectedSns.includes(sn)), quantity: freezeFoundProduct.quantity - freezeSelectedSns.length });
-        await addFrozenStock({ productId: freezeFoundProduct.id, productName: freezeFoundProduct.name, partNumber: freezeFoundProduct.partNumber, trackingType: "SN", serialNumbers: freezeSelectedSns, quantity: freezeSelectedSns.length, frozenBy: currentUser?.name || "Unknown", frozenByEmail: currentUser?.email || "", customerName: freezeCustomer || undefined, note: freezeNote || undefined });
-        await addAuditLog({ userName: currentUser?.name || "Unknown", userEmail: currentUser?.email || "", action: "Frozen", itemName: freezeFoundProduct.name, changeDetail: `Frozen ${freezeSelectedSns.length} SN${freezeSelectedSns.length > 1 ? "s" : ""}: ${freezeSelectedSns.join(", ")}`, customerName: freezeCustomer || undefined, note: freezeNote });
+        const customer = freezeCustomerId && freezeCustomerId !== "none" ? customers.find((c) => c.id === freezeCustomerId) : undefined;
+        await addFrozenStock({ productId: freezeFoundProduct.id, productName: freezeFoundProduct.name, partNumber: freezeFoundProduct.partNumber, trackingType: "SN", serialNumbers: freezeSelectedSns, quantity: freezeSelectedSns.length, frozenBy: currentUser?.name || "Unknown", frozenByEmail: currentUser?.email || "", customerName: customer?.name || undefined, note: freezeNote || undefined });
+        await addAuditLog({ userName: currentUser?.name || "Unknown", userEmail: currentUser?.email || "", action: "Frozen", itemName: freezeFoundProduct.name, changeDetail: `Frozen ${freezeSelectedSns.length} SN${freezeSelectedSns.length > 1 ? "s" : ""}: ${freezeSelectedSns.join(", ")}`, customerName: customer?.name || undefined, note: freezeNote });
         crud.completeOperation(opId, `${freezeSelectedSns.length} SN(s) frozen`);
       } catch { crud.failOperation(opId, "Failed to freeze stock"); }
     } else {
@@ -338,8 +342,9 @@ export function GlobalActionsProvider({ children }: { children: React.ReactNode 
       const opId = crud.startOperation("freeze", `Freezing ${qty} units…`);
       try {
         await updateProduct(freezeFoundProduct.id, { quantity: freezeFoundProduct.quantity - qty });
-        await addFrozenStock({ productId: freezeFoundProduct.id, productName: freezeFoundProduct.name, partNumber: freezeFoundProduct.partNumber, trackingType: "QTY", serialNumbers: [], quantity: qty, frozenBy: currentUser?.name || "Unknown", frozenByEmail: currentUser?.email || "", customerName: freezeCustomer || undefined, note: freezeNote || undefined });
-        await addAuditLog({ userName: currentUser?.name || "Unknown", userEmail: currentUser?.email || "", action: "Frozen", itemName: freezeFoundProduct.name, changeDetail: `Frozen ${qty} QTY`, customerName: freezeCustomer || undefined, note: freezeNote });
+        const customer = freezeCustomerId && freezeCustomerId !== "none" ? customers.find((c) => c.id === freezeCustomerId) : undefined;
+        await addFrozenStock({ productId: freezeFoundProduct.id, productName: freezeFoundProduct.name, partNumber: freezeFoundProduct.partNumber, trackingType: "QTY", serialNumbers: [], quantity: qty, frozenBy: currentUser?.name || "Unknown", frozenByEmail: currentUser?.email || "", customerName: customer?.name || undefined, note: freezeNote || undefined });
+        await addAuditLog({ userName: currentUser?.name || "Unknown", userEmail: currentUser?.email || "", action: "Frozen", itemName: freezeFoundProduct.name, changeDetail: `Frozen ${qty} QTY`, customerName: customer?.name || undefined, note: freezeNote });
         crud.completeOperation(opId, `${qty} unit(s) frozen`);
       } catch { crud.failOperation(opId, "Failed to freeze stock"); }
     }
@@ -355,8 +360,10 @@ export function GlobalActionsProvider({ children }: { children: React.ReactNode 
     const opId = crud.startOperation("release", action === "confirm" ? "Confirming out…" : "Returning stock…");
     try {
       if (action === "confirm") {
-        await addOutgoingSale({ customerId: "", customerName: frozen.customerName || "—", productId: frozen.productId, productName: frozen.productName, partNumber: frozen.partNumber, trackingType: frozen.trackingType, serialNumbers: frozen.serialNumbers, quantity: frozen.trackingType === "SN" ? frozen.serialNumbers.length : frozen.quantity, note: frozen.note || "" });
-        await addAuditLog({ userName: currentUser?.name || "Unknown", userEmail: currentUser?.email || "", action: "Released", itemName: frozen.productName, changeDetail: frozen.trackingType === "SN" ? `-${frozen.serialNumbers.length} SNs (released from freeze)` : `-${frozen.quantity} QTY (released from freeze)`, customerName: frozen.customerName, note: frozen.note });
+        const customer = releaseCustomerId && releaseCustomerId !== "none" ? customers.find((c) => c.id === releaseCustomerId) : undefined;
+        const custName = customer?.name || frozen.customerName || "—";
+        await addOutgoingSale({ customerId: customer?.id || "", customerName: custName, productId: frozen.productId, productName: frozen.productName, partNumber: frozen.partNumber, trackingType: frozen.trackingType, serialNumbers: frozen.serialNumbers, quantity: frozen.trackingType === "SN" ? frozen.serialNumbers.length : frozen.quantity, note: releaseNote || frozen.note || "" });
+        await addAuditLog({ userName: currentUser?.name || "Unknown", userEmail: currentUser?.email || "", action: "Released", itemName: frozen.productName, changeDetail: frozen.trackingType === "SN" ? `-${frozen.serialNumbers.length} SNs (released from freeze)` : `-${frozen.quantity} QTY (released from freeze)`, customerName: custName, note: releaseNote || frozen.note });
         crud.completeOperation(opId, `Stock confirmed out`);
       } else {
         await addAuditLog({ userName: currentUser?.name || "Unknown", userEmail: currentUser?.email || "", action: "Cancelled", itemName: frozen.productName, changeDetail: frozen.trackingType === "SN" ? `Returned ${frozen.serialNumbers.length} SNs to stock` : `Returned ${frozen.quantity} QTY to stock`, note: frozen.note });
@@ -366,6 +373,8 @@ export function GlobalActionsProvider({ children }: { children: React.ReactNode 
     } catch { crud.failOperation(opId, "Release failed"); }
     setReleasingFrozen(null);
     setReleaseAction(null);
+    setReleaseCustomerId("");
+    setReleaseNote("");
   };
 
 
@@ -374,8 +383,11 @@ export function GlobalActionsProvider({ children }: { children: React.ReactNode 
     if (!newCustomer.name || !newCustomer.email || !newCustomer.phone) { toast.error("Name, email and phone required"); return; }
     const opId = crud.startOperation("create", `Adding "${newCustomer.name}"…`);
     try {
-      await addCustomer(newCustomer);
+      const newId = await addCustomer(newCustomer);
       crud.completeOperation(opId, `Customer "${newCustomer.name}" added`);
+      if (addCustomerSource === "out") setOutCustomerId(newId);
+      if (addCustomerSource === "freeze") setFreezeCustomerId(newId);
+      if (addCustomerSource === "release") setReleaseCustomerId(newId);
     } catch { crud.failOperation(opId, "Failed to add customer"); }
     setNewCustomer({ name: "", email: "", phone: "", address: "", country: "" });
     setIsAddCustomerOpen(false);
@@ -799,7 +811,7 @@ export function GlobalActionsProvider({ children }: { children: React.ReactNode 
                         {customers.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
                       </SelectContent>
                     </Select>
-                    <Button type="button" variant="outline" size="icon" className="rounded-xl shrink-0" onClick={() => setIsAddCustomerOpen(true)}><Plus className="h-4 w-4" /></Button>
+                    <Button type="button" variant="outline" size="icon" className="rounded-xl shrink-0" onClick={() => { setIsAddCustomerOpen(true); setAddCustomerSource("out"); }}><Plus className="h-4 w-4" /></Button>
                   </div>
                 </div>
 
@@ -826,7 +838,7 @@ export function GlobalActionsProvider({ children }: { children: React.ReactNode 
                   setFreezeFoundProduct(outFoundProduct);
                   setFreezeSelectedSns(outSelectedSns);
                   setFreezeQty(outQty);
-                  setFreezeCustomer((outCustomerId && outCustomerId !== "none" ? customers.find(c => c.id === outCustomerId)?.name : undefined) || "");
+                  setFreezeCustomerId(outCustomerId);
                   setFreezeNote(outNote);
                   resetOut();
                   setConfirmFreezeOpen(true);
@@ -979,8 +991,17 @@ export function GlobalActionsProvider({ children }: { children: React.ReactNode 
                 )}
 
                 <div className="space-y-1.5">
-                  <Label htmlFor="frz-cust">Reserved for <span className="text-slate-400 font-normal">(optional)</span></Label>
-                  <Input id="frz-cust" placeholder="Customer name or reference" value={freezeCustomer} onChange={(e) => setFreezeCustomer(e.target.value)} className="rounded-xl" />
+                  <Label>Customer <span className="text-slate-400 font-normal">(optional)</span></Label>
+                  <div className="flex gap-2">
+                    <Select value={freezeCustomerId} onValueChange={setFreezeCustomerId}>
+                      <SelectTrigger className="rounded-xl flex-1"><SelectValue placeholder="Select customer" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">— None —</SelectItem>
+                        {customers.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                    <Button type="button" variant="outline" size="icon" className="rounded-xl shrink-0" onClick={() => { setIsAddCustomerOpen(true); setAddCustomerSource("freeze"); }}><Plus className="h-4 w-4" /></Button>
+                  </div>
                 </div>
                 <div className="space-y-1.5">
                   <Label htmlFor="frz-note">Note <span className="text-slate-400 font-normal">(optional)</span></Label>
@@ -1018,7 +1039,7 @@ export function GlobalActionsProvider({ children }: { children: React.ReactNode 
               {freezeFoundProduct.trackingType === "SN"
                 ? <p>{freezeSelectedSns.length} SN(s): <span className="font-mono text-xs">{freezeSelectedSns.join(", ")}</span></p>
                 : <p>Quantity: <strong>{freezeQty}</strong> units</p>}
-              {freezeCustomer && <p>Reserved for: <strong>{freezeCustomer}</strong></p>}
+              {freezeCustomerId && freezeCustomerId !== "none" && <p>Customer: <strong>{customers.find(c => c.id === freezeCustomerId)?.name}</strong></p>}
               <p className="text-slate-500 text-xs mt-1">Stock will be held until manually released.</p>
             </div>
           ) : "Are you sure?"
@@ -1085,7 +1106,13 @@ export function GlobalActionsProvider({ children }: { children: React.ReactNode 
                           size="sm"
                           className="rounded-lg text-xs text-white gap-1"
                           style={{ background: "linear-gradient(135deg, #16c60c, #0d9904)" }}
-                          onClick={() => { setReleasingFrozen(frozen); setReleaseAction("confirm"); }}
+                          onClick={() => {
+                            setReleasingFrozen(frozen);
+                            setReleaseAction("confirm");
+                            const cId = customers.find(c => c.name === frozen.customerName)?.id;
+                            setReleaseCustomerId(cId || "none");
+                            setReleaseNote(frozen.note || "");
+                          }}
                         >
                           <Check className="w-3 h-3" />Confirm Out
                         </Button>
@@ -1111,28 +1138,71 @@ export function GlobalActionsProvider({ children }: { children: React.ReactNode 
         </DialogContent>
       </Dialog>
 
-      {/* Confirm Release (Out / Return) */}
+      <Dialog open={!!(releasingFrozen && releaseAction === "confirm")} onOpenChange={(v) => { if (!v) { setReleasingFrozen(null); setReleaseAction(null); } }}>
+        <DialogContent className="max-w-md rounded-2xl">
+          <DialogHeader>
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl flex items-center justify-center bg-green-100"><Check className="w-5 h-5 text-green-600" /></div>
+              <div>
+                <DialogTitle>Confirm Out Frozen Stock</DialogTitle>
+                <DialogDescription>Finalize stock out for {releasingFrozen?.productName}</DialogDescription>
+              </div>
+            </div>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="text-sm bg-slate-50 p-3 rounded-xl border border-slate-100">
+              {releasingFrozen?.trackingType === "SN" ? (
+                <p>SNs: <span className="font-mono text-xs">{releasingFrozen.serialNumbers.join(", ")}</span></p>
+              ) : (
+                <p>Quantity: <strong>{releasingFrozen?.quantity}</strong> units</p>
+              )}
+            </div>
+            <div className="space-y-1.5">
+              <Label>Customer <span className="text-slate-400 font-normal">(optional)</span></Label>
+              <div className="flex gap-2">
+                <Select value={releaseCustomerId} onValueChange={setReleaseCustomerId}>
+                  <SelectTrigger className="rounded-xl flex-1"><SelectValue placeholder="Select customer" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">— None —</SelectItem>
+                    {customers.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+                <Button type="button" variant="outline" size="icon" className="rounded-xl shrink-0" onClick={() => { setIsAddCustomerOpen(true); setAddCustomerSource("release"); }}><Plus className="h-4 w-4" /></Button>
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="rel-note">Reference / Note <span className="text-slate-400 font-normal">(optional)</span></Label>
+              <Input id="rel-note" placeholder="e.g. PO #123, delivery note" value={releaseNote} onChange={(e) => setReleaseNote(e.target.value)} className="rounded-xl" />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" className="rounded-xl" onClick={() => { setReleasingFrozen(null); setReleaseAction(null); }}>Cancel</Button>
+            <Button className="rounded-xl text-white font-semibold" style={{ background: "linear-gradient(135deg, #16c60c, #0d9904)" }} onClick={executeRelease}>
+              <Check className="w-4 h-4 mr-1.5" />Confirm Out Stock
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <ConfirmDialog
-        open={!!(releasingFrozen && releaseAction)}
+        open={!!(releasingFrozen && releaseAction === "cancel")}
         onClose={() => { setReleasingFrozen(null); setReleaseAction(null); }}
         onConfirm={executeRelease}
-        title={releaseAction === "confirm" ? "Confirm Out Stock" : "Return to Stock"}
-        icon={releaseAction === "confirm" ? <Check className="w-5 h-5 text-green-600" /> : <X className="w-5 h-5 text-red-500" />}
+        title="Return to Stock"
+        icon={<X className="w-5 h-5 text-red-500" />}
         description={
           releasingFrozen ? (
             <div className="space-y-1">
-              <p>{releaseAction === "confirm" ? "Confirm final out for" : "Return frozen stock of"}: <strong>{releasingFrozen.productName}</strong></p>
+              <p>Return frozen stock of: <strong>{releasingFrozen.productName}</strong></p>
               {releasingFrozen.trackingType === "SN"
                 ? <p>SNs: <span className="font-mono text-xs">{releasingFrozen.serialNumbers.join(", ")}</span></p>
                 : <p>Quantity: <strong>{releasingFrozen.quantity}</strong> units</p>}
-              {releaseAction === "cancel" && <p className="text-slate-500 text-xs">Stock will be returned to the available inventory.</p>}
+              <p className="text-slate-500 text-xs">Stock will be returned to the available inventory.</p>
             </div>
           ) : ""
         }
-        confirmLabel={releaseAction === "confirm" ? "Confirm Out Stock" : "Return to Stock"}
-        confirmStyle={releaseAction === "confirm"
-          ? { background: "linear-gradient(135deg, #16c60c, #0d9904)" }
-          : { background: "linear-gradient(135deg, #dc2626, #b91c1c)" }}
+        confirmLabel="Return to Stock"
+        confirmStyle={{ background: "linear-gradient(135deg, #dc2626, #b91c1c)" }}
       />
     </QuickActionsContext.Provider>
   );

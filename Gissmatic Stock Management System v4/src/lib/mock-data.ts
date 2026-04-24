@@ -6,6 +6,6 @@ export const mockProducts: Product[] = [];
 export const mockSuppliers: Supplier[] = [];
 export const mockCustomers: Customer[] = [];
 export const mockOutgoingSales: OutgoingSale[] = [];
-export const defaultCategories = ["Electronics", "Accessories", "Furniture", "Office Supplies", "Hardware", "Software"];
+export const defaultCategories: string[] = [];
 export const mockAuditLogs: AuditLog[] = [];
 export const mockFrozenStocks: FrozenStock[] = [];

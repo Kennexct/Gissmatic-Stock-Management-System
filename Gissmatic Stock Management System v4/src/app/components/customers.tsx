@@ -61,7 +61,7 @@ export function Customers() {
     new Date(d).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" });
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 pt-14 lg:pt-0">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
