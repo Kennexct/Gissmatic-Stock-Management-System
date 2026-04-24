@@ -113,10 +113,8 @@ export function GlobalActionsProvider({ children }: { children: React.ReactNode 
   // New product fields (when PN not found)
   const [addIsNew, setAddIsNew] = useState(false);
   const [newProdForm, setNewProdForm] = useState({ name: "", category: "", trackingType: "QTY" as "SN" | "QTY", supplierName: "" });
-  const [isAddCategoryOpen, setIsAddCategoryOpen] = useState(false);
-  const [isAddSupplierOpen, setIsAddSupplierOpen] = useState(false);
-  const [newCategory, setNewCategory] = useState("");
-  const [newSupplier, setNewSupplier] = useState({ name: "", phone: "", email: "", address: "", country: "" });
+  const [isCustomCategory, setIsCustomCategory] = useState(false);
+  const [isCustomSupplier, setIsCustomSupplier] = useState(false);
   const [confirmAddOpen, setConfirmAddOpen] = useState(false);
 
   // ── Out Stock ──
