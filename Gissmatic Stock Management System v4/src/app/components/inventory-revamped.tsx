@@ -21,6 +21,10 @@ import { useCrudProgress } from "./crud-progress";
 import { Product } from "../../lib/types";
 import { toast } from "sonner";
 import * as XLSX from "xlsx";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
+import { Skeleton } from "./ui/skeleton";
+import { Checkbox } from "./ui/checkbox";
 
 // ── Add New Product Modal ───────────────────────────────────────────
 function AddNewProductModal({ onClose }: { onClose: () => void }) {
@@ -683,10 +687,11 @@ function ImportProductsModal({ onClose }: { onClose: () => void }) {
 
 // ── Main Inventory Component ───────────────────────────────────────
 export function Inventory() {
-  const { products, currentUser, getUserPermissions, deleteProduct } = useAuth();
+  const { products, currentUser, getUserPermissions, deleteProduct, isLoading } = useAuth();
   const quickActions = useQuickActions();
   const crud = useCrudProgress();
 
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [confirmConfig, setConfirmConfig] = useState<{
     isOpen: boolean; title: string; desc: string; action: string; onConfirm: () => void;
   } | null>(null);
@@ -715,6 +720,52 @@ export function Inventory() {
 
   const totalStock = products.reduce((a, p) => a + p.quantity, 0);
 
+  const exportToExcel = () => {
+    const data = products.map(p => ({
+      "Part Number": p.partNumber,
+      "Product Name": p.name,
+      "Category": p.category,
+      "Supplier": p.supplierName,
+      "Tracking Type": p.trackingType,
+      "Stock Level": p.quantity,
+      "Serial Numbers": p.serialNumbers.join(", "),
+      "Last Updated": new Date(p.lastUpdated).toLocaleDateString()
+    }));
+    const ws = XLSX.utils.json_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Inventory");
+    XLSX.writeFile(wb, `Inventory_Export_${new Date().toISOString().split('T')[0]}.xlsx`);
+  };
+
+  const exportToPDF = () => {
+    const doc = new jsPDF();
+    doc.setFontSize(18);
+    doc.setTextColor(10, 21, 101); // #0a1565
+    doc.text("Gissmatic Inventory Report", 14, 22);
+    doc.setFontSize(11);
+    doc.setTextColor(100);
+    doc.text(`Generated on: ${new Date().toLocaleString()}`, 14, 30);
+    doc.text(`Total Items: ${products.length} | Total Units: ${totalStock}`, 14, 36);
+
+    const tableData = products.map(p => [
+      p.partNumber,
+      p.name,
+      p.category,
+      p.trackingType,
+      p.quantity.toString()
+    ]);
+
+    autoTable(doc, {
+      startY: 45,
+      head: [["PN", "Name", "Category", "Type", "Stock"]],
+      body: tableData,
+      headStyles: { fillColor: [10, 21, 101], textColor: [255, 255, 255] },
+      alternateRowStyles: { fillColor: [248, 251, 255] },
+    });
+
+    doc.save(`Inventory_Report_${new Date().toISOString().split('T')[0]}.pdf`);
+  };
+
   return (
     <div className="space-y-6 pt-14 lg:pt-0">
       {/* Header */}
@@ -725,14 +776,28 @@ export function Inventory() {
             {products.length} part{products.length !== 1 ? "s" : ""} · {totalStock.toLocaleString()} total units
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
+          <Button
+            onClick={exportToExcel}
+            variant="outline"
+            className="rounded-xl gap-2 border-slate-200 text-slate-600"
+          >
+            <Download className="w-4 h-4" />Excel
+          </Button>
+          <Button
+            onClick={exportToPDF}
+            variant="outline"
+            className="rounded-xl gap-2 border-slate-200 text-slate-600"
+          >
+            <FileSpreadsheet className="w-4 h-4" />PDF
+          </Button>
           {canImport && (
             <Button
               onClick={() => setIsImportOpen(true)}
               variant="outline"
               className="rounded-xl gap-2 border-slate-200"
             >
-              <FileSpreadsheet className="w-4 h-4" />Import Products
+              <Download className="w-4 h-4" />Import
             </Button>
           )}
           {canAdd && (
@@ -758,11 +823,64 @@ export function Inventory() {
         />
       </div>
 
+      {/* Bulk Actions Floating Bar */}
+      {selectedIds.length > 0 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 bg-[#0a1565] text-white px-6 py-3 rounded-2xl shadow-2xl flex items-center gap-6 animate-in slide-in-from-bottom-4 duration-300">
+          <div className="flex items-center gap-2 border-r border-white/20 pr-6">
+            <span className="bg-white/20 px-2 py-0.5 rounded text-xs font-bold">{selectedIds.length}</span>
+            <span className="text-sm font-medium">Items Selected</span>
+          </div>
+          <div className="flex items-center gap-3">
+            <Button 
+              variant="ghost" 
+              className="text-white hover:bg-white/10 rounded-xl h-9"
+              onClick={() => setSelectedIds([])}
+            >
+              Clear
+            </Button>
+            {isSuperAdmin && (
+              <Button 
+                variant="destructive" 
+                className="bg-red-500 hover:bg-red-600 rounded-xl h-9 gap-2"
+                onClick={() => {
+                  requestConfirm(
+                    "Bulk Delete",
+                    `Are you sure you want to delete ${selectedIds.length} items? This action is permanent.`,
+                    `Delete ${selectedIds.length} Items`,
+                    async () => {
+                      const opId = crud.startOperation("delete", `Deleting ${selectedIds.length} items…`);
+                      try {
+                        await Promise.all(selectedIds.map(id => deleteProduct(id)));
+                        setSelectedIds([]);
+                        crud.completeOperation(opId, `${selectedIds.length} items deleted`);
+                      } catch {
+                        crud.failOperation(opId, "Failed to delete some items");
+                      }
+                    }
+                  );
+                }}
+              >
+                <Trash2 className="w-4 h-4" /> Delete Selected
+              </Button>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Table */}
       <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-x-auto">
         <Table>
           <TableHeader>
             <TableRow className="hover:bg-transparent border-b border-slate-100" style={{ background: "#f8fbff" }}>
+              <TableHead className="w-12 text-center">
+                <Checkbox 
+                  checked={selectedIds.length === products.length && products.length > 0} 
+                  onCheckedChange={(checked) => {
+                    setSelectedIds(checked ? products.map(p => p.id) : []);
+                  }}
+                  className="rounded-md border-slate-300"
+                />
+              </TableHead>
               <TableHead className="text-slate-500 font-medium">Product</TableHead>
               <TableHead className="text-slate-500 font-medium">Part Number</TableHead>
               <TableHead className="text-slate-500 font-medium hidden md:table-cell">Category</TableHead>
@@ -774,7 +892,21 @@ export function Inventory() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {filteredProducts.length === 0 ? (
+            {isLoading ? (
+              Array.from({ length: 5 }).map((_, i) => (
+                <TableRow key={i}>
+                  <TableCell className="w-12"><Skeleton className="h-4 w-4 mx-auto rounded" /></TableCell>
+                  <TableCell><div className="flex items-center gap-2.5"><Skeleton className="h-9 w-9 rounded-lg" /><div className="space-y-1"><Skeleton className="h-4 w-24" /><Skeleton className="h-3 w-16" /></div></div></TableCell>
+                  <TableCell><Skeleton className="h-4 w-20" /></TableCell>
+                  <TableCell className="hidden md:table-cell"><Skeleton className="h-5 w-16 rounded-lg" /></TableCell>
+                  <TableCell className="hidden lg:table-cell"><Skeleton className="h-4 w-24" /></TableCell>
+                  <TableCell><Skeleton className="h-5 w-12 rounded-lg" /></TableCell>
+                  <TableCell><Skeleton className="h-4 w-8 ml-auto" /></TableCell>
+                  <TableCell><Skeleton className="h-5 w-16 rounded-full" /></TableCell>
+                  <TableCell><Skeleton className="h-8 w-16 ml-auto rounded-lg" /></TableCell>
+                </TableRow>
+              ))
+            ) : filteredProducts.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={8} className="text-center py-16 text-slate-400">
                   <Package2 className="w-10 h-10 mx-auto mb-2 opacity-20" />
@@ -795,6 +927,15 @@ export function Inventory() {
                 const isOutOfStock = product.quantity === 0;
                 return (
                   <TableRow key={product.id} className="border-b border-slate-50 hover:bg-[#f8fbff] transition-colors">
+                    <TableCell className="w-12 text-center">
+                      <Checkbox 
+                        checked={selectedIds.includes(product.id)}
+                        onCheckedChange={(checked) => {
+                          setSelectedIds(prev => checked ? [...prev, product.id] : prev.filter(id => id !== product.id));
+                        }}
+                        className="rounded-md border-slate-200"
+                      />
+                    </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2.5">
                         {product.imageUrl ? (

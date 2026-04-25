@@ -38,6 +38,7 @@ interface AuthContextType {
   getUserPermissions: (userId: string) => UserPermissions;
   updateUserPermissions: (userId: string, updates: Partial<UserPermissions>) => void;
   factoryReset: () => Promise<{ success: boolean; error?: string }>;
+  isLoading: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -64,6 +65,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [permissions, setPermissions] = useState<UserPermissions[]>([]);
   const [categories, setCategories] = useState<string[]>([]);
   const [currency, setCurrencyState] = useState<string>("USD");
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     const storedUser = localStorage.getItem("currentUser");
@@ -235,6 +237,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           canExportReports: db.can_export_reports ?? false,
         })));
       }
+      setIsLoading(false);
     };
     fetchAllFromSupabase();
   }, []);
@@ -762,7 +765,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       permissions, categories, currency, login, logout, updateProfile, updatePassword, addUser, deleteUser,
       addProduct, updateProduct, deleteProduct, addAuditLog, addSupplier, updateSupplier, addCustomer, deleteCustomer,
       addOutgoingSale, addFrozenStock, releaseFrozenStock, addCategory, deleteCategory, setCurrency: setCurrencyState,
-      getUserPermissions, updateUserPermissions, factoryReset
+      getUserPermissions, updateUserPermissions, factoryReset, isLoading
     }}>
       {children}
     </AuthContext.Provider>

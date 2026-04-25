@@ -7,7 +7,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { Button } from "./ui/button";
 import { useAuth } from "./auth-context";
 import { useQuickActions } from "./global-actions";
+import { Skeleton } from "./ui/skeleton";
 import { Product } from "../../lib/types";
+import {
+  PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend,
+  AreaChart, Area, XAxis, YAxis, CartesianGrid
+} from "recharts";
 
 interface DashboardProps {
   onNavigate?: (page: string) => void;
@@ -65,8 +70,31 @@ function StatDetailModal({
 }
 
 export function Dashboard({ onNavigate }: DashboardProps) {
-  const { products, outgoingSales, customers, suppliers, categories, frozenStocks, currentUser, getUserPermissions } = useAuth();
+  const { products, auditLogs, outgoingSales, customers, suppliers, categories, frozenStocks, currentUser, getUserPermissions, isLoading } = useAuth();
   const quickActions = useQuickActions();
+
+  // ── Chart Data Calculations ─────────────────────────────────────
+  
+  // 1. Stock Distribution by Category (Pie Chart)
+  const categoryData = categories.map(cat => {
+    const count = products.filter(p => p.category === cat).length;
+    return { name: cat, value: count };
+  }).filter(c => c.value > 0).sort((a, b) => b.value - a.value).slice(0, 5);
+
+  const COLORS = ['#0a1565', '#16c60c', '#0ea5e9', '#7c3aed', '#f59e0b'];
+
+  // 2. Movement Trend (Last 7 Days)
+  const last7Days = Array.from({ length: 7 }, (_, i) => {
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    return d.toISOString().split('T')[0];
+  }).reverse();
+
+  const trendData = last7Days.map(date => {
+    const ins = (auditLogs || []).filter(l => l.timestamp.startsWith(date) && (l.action === "Stock-In" || l.action === "Created")).length;
+    const outs = (outgoingSales || []).filter(s => s.timestamp.startsWith(date)).length;
+    return { date: date.split('-').slice(1).join('/'), ins, outs };
+  });
 
   const isSuperAdmin = currentUser?.role === "superadmin";
   const perms = currentUser ? getUserPermissions(currentUser.id) : null;
@@ -201,7 +229,17 @@ export function Dashboard({ onNavigate }: DashboardProps) {
 
       {/* Stats — clickable cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {statCards.map((s) => (
+        {isLoading ? (
+          Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm space-y-3">
+              <div className="flex justify-between items-start">
+                <div className="space-y-2"><Skeleton className="h-4 w-20" /><Skeleton className="h-6 w-12" /></div>
+                <Skeleton className="h-10 w-10 rounded-xl" />
+              </div>
+              <Skeleton className="h-3 w-24" />
+            </div>
+          ))
+        ) : statCards.map((s) => (
           <button
             key={s.title}
             onClick={s.onClick}
@@ -226,6 +264,38 @@ export function Dashboard({ onNavigate }: DashboardProps) {
           </button>
         ))}
       </div>
+
+      {/* Movement Trend Chart */}
+      <Card className="rounded-2xl border-slate-100 shadow-sm overflow-hidden">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base font-semibold" style={{ color: "#0a1565" }}>Stock Activity Trend (Last 7 Days)</CardTitle>
+        </CardHeader>
+        <CardContent className="h-64 pt-4">
+          <ResponsiveContainer width="100%" height="100%">
+            <AreaChart data={trendData}>
+              <defs>
+                <linearGradient id="colorIns" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#0a1565" stopOpacity={0.1}/>
+                  <stop offset="95%" stopColor="#0a1565" stopOpacity={0}/>
+                </linearGradient>
+                <linearGradient id="colorOuts" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#16c60c" stopOpacity={0.1}/>
+                  <stop offset="95%" stopColor="#16c60c" stopOpacity={0}/>
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+              <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{fill: '#94a3b8', fontSize: 11}} dy={10} />
+              <YAxis axisLine={false} tickLine={false} tick={{fill: '#94a3b8', fontSize: 11}} />
+              <Tooltip 
+                contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
+                itemStyle={{ fontSize: '12px', fontWeight: 600 }}
+              />
+              <Area type="monotone" dataKey="ins" stroke="#0a1565" strokeWidth={3} fillOpacity={1} fill="url(#colorIns)" name="Stock-In" />
+              <Area type="monotone" dataKey="outs" stroke="#16c60c" strokeWidth={3} fillOpacity={1} fill="url(#colorOuts)" name="Stock-Out" />
+            </AreaChart>
+          </ResponsiveContainer>
+        </CardContent>
+      </Card>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Recent Stock Movements */}
@@ -288,7 +358,33 @@ export function Dashboard({ onNavigate }: DashboardProps) {
             <CardHeader className="pb-3">
               <CardTitle className="text-base" style={{ color: "#0a1565" }}>System Overview</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-1">
+            <CardContent className="space-y-4">
+              {/* Category Pie Chart */}
+              <div className="h-48">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={categoryData}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={45}
+                      outerRadius={70}
+                      paddingAngle={5}
+                      dataKey="value"
+                    >
+                      {categoryData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                      ))}
+                    </Pie>
+                    <Tooltip 
+                      contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
+                      itemStyle={{ fontSize: '11px' }}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+
+              <div className="space-y-1">
               {[
                 { label: "Customers", value: customers.length, emoji: "👤", page: "customers" },
                 { label: "Suppliers", value: suppliers.length, emoji: "🏭", page: "suppliers" },
