@@ -1112,12 +1112,10 @@ export function GlobalActionsProvider({ children }: { children: React.ReactNode 
         confirmLabel="Return to Stock"
         confirmStyle={{ background: "linear-gradient(135deg, #dc2626, #b91c1c)" }}
       />
-        </DialogContent>
-      </Dialog>
 
       {/* Discard Changes Confirmation */}
       <ConfirmDialog
-        open={!!exitConfirm}
+        open={exitConfirm?.isOpen ?? false}
         onClose={() => setExitConfirm(null)}
         onConfirm={exitConfirm?.onDiscard || (() => {})}
         title="Discard Changes?"
