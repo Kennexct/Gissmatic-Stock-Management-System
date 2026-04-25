@@ -387,15 +387,34 @@ function EditProductModal({
           </div>
         </div>
 
-        <DialogFooter>
-          <Button variant="outline" className="rounded-xl" onClick={onClose}>Cancel</Button>
-          <Button
-            className="rounded-xl text-white"
-            style={{ background: "linear-gradient(135deg, #0a1565, #1229b3)" }}
-            onClick={handleSave}
-          >
-            <Pencil className="w-4 h-4 mr-1.5" />Save Changes
-          </Button>
+        <DialogFooter className="flex flex-col sm:flex-row justify-between gap-3">
+          <div className="flex gap-2 w-full sm:w-auto order-2 sm:order-1">
+            {(currentUser?.role === 'superadmin') && (
+              <Button
+                variant="destructive"
+                className="rounded-xl px-4"
+                onClick={() => {
+                  if (confirm(`Are you sure you want to delete "${product.name}"? This action is permanent.`)) {
+                    deleteProduct(product.id);
+                    onClose();
+                    toast.success("Product deleted successfully");
+                  }
+                }}
+              >
+                <Trash2 className="w-4 h-4 mr-1.5" />Delete
+              </Button>
+            )}
+          </div>
+          <div className="flex gap-2 w-full sm:w-auto order-1 sm:order-2 justify-end">
+            <Button variant="outline" className="rounded-xl" onClick={onClose}>Cancel</Button>
+            <Button
+              className="rounded-xl text-white"
+              style={{ background: "linear-gradient(135deg, #0a1565, #1229b3)" }}
+              onClick={handleSave}
+            >
+              <Pencil className="w-4 h-4 mr-1.5" />Save Changes
+            </Button>
+          </div>
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -404,7 +423,7 @@ function EditProductModal({
 
 // ── Import Products Modal ──────────────────────────────────────────
 function ImportProductsModal({ onClose }: { onClose: () => void }) {
-  const { addProduct, updateProduct, addAuditLog, currentUser, categories, suppliers, products } = useAuth();
+  const { addProduct, updateProduct, deleteProduct, addAuditLog, currentUser, categories, suppliers, products } = useAuth();
   const [importData, setImportData] = useState<any[]>([]);
   const [validationResults, setValidationResults] = useState<{valid: boolean; reason?: string}[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -542,8 +561,9 @@ function ImportProductsModal({ onClose }: { onClose: () => void }) {
     onClose();
   };
 
-  const hasErrors = validationResults.some(r => !r.valid);
-  const canConfirm = importData.length > 0 && !hasErrors && !isProcessing;
+  const validRows = importData.filter((_, i) => validationResults[i]?.valid);
+  const errorCount = importData.length - validRows.length;
+  const canConfirm = validRows.length > 0 && !isProcessing;
 
   return (
     <Dialog open onOpenChange={onClose}>
@@ -589,9 +609,16 @@ function ImportProductsModal({ onClose }: { onClose: () => void }) {
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <p className="font-semibold text-slate-900">3. Preview & Validation</p>
-                <span className={`text-xs font-bold px-2 py-1 rounded-full ${hasErrors ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-600'}`}>
-                  {hasErrors ? 'Errors Found' : 'All Rows Valid'}
-                </span>
+                <div className="flex items-center gap-2">
+                  {errorCount > 0 && (
+                    <span className="text-[10px] font-bold px-2 py-1 rounded-full bg-amber-100 text-amber-700">
+                      {errorCount} errors will be skipped
+                    </span>
+                  )}
+                  <span className={`text-xs font-bold px-2 py-1 rounded-full ${errorCount > 0 ? 'bg-amber-50 text-amber-600' : 'bg-green-100 text-green-600'}`}>
+                    {validRows.length} rows ready
+                  </span>
+                </div>
               </div>
               <div className="border rounded-xl overflow-hidden overflow-x-auto">
                 <Table>
@@ -629,16 +656,21 @@ function ImportProductsModal({ onClose }: { onClose: () => void }) {
           )}
         </div>
 
-        <DialogFooter className="pt-4 border-t">
-          <Button variant="outline" className="rounded-xl" onClick={onClose} disabled={isProcessing}>Cancel</Button>
-          <Button 
-            onClick={handleImport}
-            disabled={!canConfirm}
-            className="rounded-xl text-white min-w-[140px]"
-            style={{ background: canConfirm ? "linear-gradient(135deg, #0a1565, #1229b3)" : "#e2e8f0" }}
-          >
-            {isProcessing ? "Processing..." : "Confirm Import"}
-          </Button>
+        <DialogFooter className="pt-4 border-t flex items-center justify-between">
+          <div className="text-xs text-slate-400">
+            {errorCount > 0 && `Note: ${errorCount} rows with errors will be ignored.`}
+          </div>
+          <div className="flex gap-2">
+            <Button variant="outline" className="rounded-xl" onClick={onClose} disabled={isProcessing}>Cancel</Button>
+            <Button 
+              onClick={handleImport}
+              disabled={!canConfirm}
+              className="rounded-xl text-white min-w-[140px]"
+              style={{ background: canConfirm ? "linear-gradient(135deg, #0a1565, #1229b3)" : "#e2e8f0" }}
+            >
+              {isProcessing ? "Processing..." : `Import ${validRows.length} Items`}
+            </Button>
+          </div>
         </DialogFooter>
       </DialogContent>
     </Dialog>

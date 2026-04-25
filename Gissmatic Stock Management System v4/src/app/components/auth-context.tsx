@@ -23,6 +23,7 @@ interface AuthContextType {
   deleteUser: (id: string) => void;
   addProduct: (product: Omit<Product, "id" | "lastUpdated">) => void;
   updateProduct: (id: string, updates: Partial<Product>) => void;
+  deleteProduct: (id: string) => Promise<void>;
   addAuditLog: (log: Omit<AuditLog, "id" | "timestamp">) => void;
   addSupplier: (supplier: Omit<Supplier, "id" | "createdAt">) => void;
   updateSupplier: (id: string, updates: Partial<Supplier>) => void;
@@ -498,6 +499,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (error) console.error("Supabase update product error:", error);
   };
 
+  const deleteProduct = async (id: string) => {
+    const product = products.find(p => p.id === id);
+    if (!product) return;
+    
+    setProducts(prev => prev.filter(p => p.id !== id));
+    // Log deletion
+    addAuditLog({
+      userName: currentUser?.name || "System",
+      userEmail: currentUser?.email || "",
+      action: "Deleted",
+      itemName: product.name,
+      changeDetail: `Product "${product.name}" (${product.partNumber}) removed from system`
+    });
+    // Delete from Supabase
+    await supabase.from('products').delete().eq('id', id);
+  };
+
   const addAuditLog = async (logData: Omit<AuditLog, "id" | "timestamp">) => {
     const timestamp = new Date().toISOString();
     const newLog: AuditLog = { ...logData, id: `A${Date.now()}`, timestamp };
@@ -742,7 +760,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     <AuthContext.Provider value={{
       currentUser, users, products, auditLogs, suppliers, customers, outgoingSales, frozenStocks,
       permissions, categories, currency, login, logout, updateProfile, updatePassword, addUser, deleteUser,
-      addProduct, updateProduct, addAuditLog, addSupplier, updateSupplier, addCustomer, deleteCustomer,
+      addProduct, updateProduct, deleteProduct, addAuditLog, addSupplier, updateSupplier, addCustomer, deleteCustomer,
       addOutgoingSale, addFrozenStock, releaseFrozenStock, addCategory, deleteCategory, setCurrency: setCurrencyState,
       getUserPermissions, updateUserPermissions, factoryReset
     }}>
