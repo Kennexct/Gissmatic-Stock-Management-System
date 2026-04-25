@@ -16,7 +16,7 @@ import {
 } from "./ui/select";
 import { Label } from "./ui/label";
 import { useAuth } from "./auth-context";
-import { useQuickActions } from "./global-actions";
+import { useQuickActions, ConfirmDialog } from "./global-actions";
 import { useCrudProgress } from "./crud-progress";
 import { Product } from "../../lib/types";
 import { toast } from "sonner";
@@ -36,8 +36,14 @@ function AddNewProductModal({ onClose }: { onClose: () => void }) {
   const [addQty, setAddQty] = useState("");
   const [isCustomCategory, setIsCustomCategory] = useState(false);
   const [isCustomSupplier, setIsCustomSupplier] = useState(false);
+  const [showExitConfirm, setShowExitConfirm] = useState(false);
 
-  const isSnMode = addSnList.length > 0 || addSnInput.trim() !== "";
+  const isDirty = form.name || form.pn || form.category || form.supplierName || addSnList.length > 0 || addSnInput || addQty;
+
+  const handleCloseAttempt = () => {
+    if (isDirty) setShowExitConfirm(true);
+    else onClose();
+  };
   const isQtyMode = addQty.trim() !== "";
 
   const handleAddSn = () => {
@@ -73,8 +79,12 @@ function AddNewProductModal({ onClose }: { onClose: () => void }) {
   };
 
   return (
-    <Dialog open onOpenChange={onClose}>
-      <DialogContent className="max-w-lg rounded-2xl max-h-[90vh] overflow-y-auto">
+    <Dialog open onOpenChange={handleCloseAttempt}>
+      <DialogContent 
+        className="max-w-lg rounded-2xl max-h-[90vh] overflow-y-auto"
+        onPointerDownOutside={(e) => { if (isDirty) e.preventDefault(); }}
+        onEscapeKeyDown={(e) => { if (isDirty) e.preventDefault(); }}
+      >
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-[#0a1565]">
@@ -1089,6 +1099,17 @@ export function Inventory() {
             </Button>
           </DialogFooter>
         </DialogContent>
+
+        <ConfirmDialog
+          open={showExitConfirm}
+          onClose={() => setShowExitConfirm(false)}
+          onConfirm={onClose}
+          title="Discard Changes?"
+          description="You have unsaved product details. Are you sure you want to exit? Your progress will be lost."
+          confirmLabel="Discard & Exit"
+          confirmStyle={{ background: "linear-gradient(135deg, #ef4444, #b91c1c)" }}
+          icon={<AlertTriangle className="w-5 h-5 text-red-500" />}
+        />
       </Dialog>
     </div>
   );

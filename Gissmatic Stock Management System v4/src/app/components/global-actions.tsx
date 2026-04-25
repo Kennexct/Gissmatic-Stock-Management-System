@@ -67,7 +67,7 @@ interface ConfirmDialogProps {
   confirmStyle?: React.CSSProperties;
   icon?: React.ReactNode;
 }
-function ConfirmDialog({ open, onClose, onConfirm, title, description, confirmLabel = "Confirm", confirmStyle, icon }: ConfirmDialogProps) {
+export function ConfirmDialog({ open, onClose, onConfirm, title, description, confirmLabel = "Confirm", confirmStyle, icon }: ConfirmDialogProps) {
   return (
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="max-w-sm rounded-2xl">
@@ -145,6 +145,26 @@ export function GlobalActionsProvider({ children }: { children: React.ReactNode 
   const [releaseAction, setReleaseAction] = useState<"confirm" | "cancel" | null>(null);
   const [releaseCustomerId, setReleaseCustomerId] = useState("");
   const [releaseNote, setReleaseNote] = useState("");
+  const [exitConfirm, setExitConfirm] = useState<{ isOpen: boolean; onDiscard: () => void } | null>(null);
+
+  const isAddDirty = addPn.trim() !== "" || addSnList.length > 0 || addQty.trim() !== "" || addNote.trim() !== "";
+  const isOutDirty = outPn.trim() !== "" || outSelectedSns.length > 0 || outQty.trim() !== "" || outNote.trim() !== "";
+  const isFreezeDirty = freezePn.trim() !== "" || freezeSelectedSns.length > 0 || freezeQty.trim() !== "" || freezeNote.trim() !== "";
+
+  const handleAddCloseAttempt = () => {
+    if (isAddDirty) setExitConfirm({ isOpen: true, onDiscard: () => { setIsAddOpen(false); resetAdd(); setExitConfirm(null); } });
+    else { setIsAddOpen(false); resetAdd(); }
+  };
+
+  const handleOutCloseAttempt = () => {
+    if (isOutDirty) setExitConfirm({ isOpen: true, onDiscard: () => { setIsOutOpen(false); resetOut(); setExitConfirm(null); } });
+    else { setIsOutOpen(false); resetOut(); }
+  };
+
+  const handleFreezeCloseAttempt = () => {
+    if (isFreezeDirty) setExitConfirm({ isOpen: true, onDiscard: () => { setIsFreezeOpen(false); resetFreeze(); setExitConfirm(null); } });
+    else { setIsFreezeOpen(false); resetFreeze(); }
+  };
 
   // ─── Part number lookup helpers ───
   const lookupProduct = (pn: string) =>
@@ -459,8 +479,12 @@ export function GlobalActionsProvider({ children }: { children: React.ReactNode 
       )}
 
       {/* ═══ ADD STOCK MODAL ═══ */}
-      <Dialog open={isAddOpen} onOpenChange={(v) => { if (!v) { setIsAddOpen(false); resetAdd(); } }}>
-        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto rounded-2xl">
+      <Dialog open={isAddOpen} onOpenChange={handleAddCloseAttempt}>
+        <DialogContent 
+          className="max-w-lg max-h-[90vh] overflow-y-auto rounded-2xl"
+          onPointerDownOutside={(e) => { if (isAddDirty) e.preventDefault(); }}
+          onEscapeKeyDown={(e) => { if (isAddDirty) e.preventDefault(); }}
+        >
           <DialogHeader>
             <div className="flex items-center gap-3">
               <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: "linear-gradient(135deg, #0a1565, #1229b3)" }}>
@@ -590,8 +614,12 @@ export function GlobalActionsProvider({ children }: { children: React.ReactNode 
       />
 
       {/* ═══ OUT STOCK MODAL ═══ */}
-      <Dialog open={isOutOpen} onOpenChange={(v) => { if (!v) { setIsOutOpen(false); resetOut(); } }}>
-        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto rounded-2xl">
+      <Dialog open={isOutOpen} onOpenChange={handleOutCloseAttempt}>
+        <DialogContent 
+          className="max-w-lg max-h-[90vh] overflow-y-auto rounded-2xl"
+          onPointerDownOutside={(e) => { if (isOutDirty) e.preventDefault(); }}
+          onEscapeKeyDown={(e) => { if (isOutDirty) e.preventDefault(); }}
+        >
           <DialogHeader>
             <div className="flex items-center gap-3">
               <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: "linear-gradient(135deg, #16c60c, #0d9904)" }}>
@@ -783,8 +811,12 @@ export function GlobalActionsProvider({ children }: { children: React.ReactNode 
       />
 
       {/* ═══ FREEZE STOCK MODAL ═══ */}
-      <Dialog open={isFreezeOpen} onOpenChange={(v) => { if (!v) { setIsFreezeOpen(false); resetFreeze(); } }}>
-        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto rounded-2xl">
+      <Dialog open={isFreezeOpen} onOpenChange={handleFreezeCloseAttempt}>
+        <DialogContent 
+          className="max-w-lg max-h-[90vh] overflow-y-auto rounded-2xl"
+          onPointerDownOutside={(e) => { if (isFreezeDirty) e.preventDefault(); }}
+          onEscapeKeyDown={(e) => { if (isFreezeDirty) e.preventDefault(); }}
+        >
           <DialogHeader>
             <div className="flex items-center gap-3">
               <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: "linear-gradient(135deg, #0ea5e9, #0369a1)" }}>
@@ -1079,6 +1111,20 @@ export function GlobalActionsProvider({ children }: { children: React.ReactNode 
         }
         confirmLabel="Return to Stock"
         confirmStyle={{ background: "linear-gradient(135deg, #dc2626, #b91c1c)" }}
+      />
+        </DialogContent>
+      </Dialog>
+
+      {/* Discard Changes Confirmation */}
+      <ConfirmDialog
+        open={!!exitConfirm}
+        onClose={() => setExitConfirm(null)}
+        onConfirm={exitConfirm?.onDiscard || (() => {})}
+        title="Discard Changes?"
+        description="You have unsaved information in this form. Are you sure you want to close it? All progress will be lost."
+        confirmLabel="Discard & Exit"
+        confirmStyle={{ background: "linear-gradient(135deg, #ef4444, #b91c1c)" }}
+        icon={<AlertTriangle className="w-5 h-5 text-red-500" />}
       />
     </QuickActionsContext.Provider>
   );
