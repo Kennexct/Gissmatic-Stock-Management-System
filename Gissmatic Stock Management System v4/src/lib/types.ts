@@ -21,6 +21,7 @@ export interface UserPermissions {
   canStockIn: boolean;
   canOutStock: boolean;
   canFreezeStock: boolean;
+  canImportProducts: boolean;
   // Customers
   canViewCustomers: boolean;
   canManageCustomers: boolean;

@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import {
   Search, Plus, Package2, AlertTriangle, Pencil, X, ImageOff, Clock, ChevronDown, ChevronUp,
+  FileSpreadsheet, Download, AlertCircle, CheckCircle2,
 } from "lucide-react";
 import { Input } from "./ui/input";
 import { Button } from "./ui/button";
@@ -18,6 +19,7 @@ import { useAuth } from "./auth-context";
 import { useQuickActions } from "./global-actions";
 import { Product } from "../../lib/types";
 import { toast } from "sonner";
+import * as XLSX from "xlsx";
 
 // ── Add New Product Modal ───────────────────────────────────────────
 function AddNewProductModal({ onClose }: { onClose: () => void }) {
@@ -400,6 +402,249 @@ function EditProductModal({
   );
 }
 
+// ── Import Products Modal ──────────────────────────────────────────
+function ImportProductsModal({ onClose }: { onClose: () => void }) {
+  const { addProduct, updateProduct, addAuditLog, currentUser, categories, suppliers, products } = useAuth();
+  const [importData, setImportData] = useState<any[]>([]);
+  const [validationResults, setValidationResults] = useState<{valid: boolean; reason?: string}[]>([]);
+  const [isProcessing, setIsProcessing] = useState(false);
+
+  const downloadTemplate = () => {
+    const templateData = [
+      ["Part Number", "Product Name", "Category", "Supplier", "Tracking Type", "Stock (QTY or SNs)"],
+      ["PN-QTY-001", "Example QTY Product", categories[0] || "General", suppliers[0]?.name || "N/A", "QTY", "10"],
+      ["PN-SN-001", "Example SN Product", categories[0] || "General", suppliers[0]?.name || "N/A", "SN", "SN1001; SN1002; SN1003"],
+    ];
+    const ws = XLSX.utils.aoa_to_sheet(templateData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Template");
+    XLSX.writeFile(wb, "Inventory_Import_Template.xlsx");
+  };
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const bstr = event.target?.result;
+      const wb = XLSX.read(bstr, { type: "binary" });
+      const wsname = wb.SheetNames[0];
+      const ws = wb.Sheets[wsname];
+      const data = XLSX.utils.sheet_to_json(ws);
+      validateData(data);
+    };
+    reader.readAsBinaryString(file);
+  };
+
+  const validateData = (data: any[]) => {
+    const results = data.map((row: any) => {
+      const pn = String(row["Part Number"] || "").trim();
+      const name = String(row["Product Name"] || "").trim();
+      const cat = String(row["Category"] || "").trim();
+      const sup = String(row["Supplier"] || "").trim();
+      const type = String(row["Tracking Type"] || "").trim().toUpperCase();
+      const stock = String(row["Stock (QTY or SNs)"] || "").trim();
+
+      if (!pn || !name || !cat || !type) return { valid: false, reason: "Missing required fields" };
+      if (type !== "SN" && type !== "QTY") return { valid: false, reason: "Invalid Tracking Type (use SN or QTY)" };
+
+      // Strict Option A: Check category/supplier
+      if (!categories.includes(cat)) return { valid: false, reason: `Category "${cat}" not found` };
+      if (sup && sup !== "N/A" && !suppliers.some(s => s.name === sup)) return { valid: false, reason: `Supplier "${sup}" not found` };
+
+      // Check PN duplication logic
+      const existing = products.find(p => p.partNumber.toUpperCase() === pn.toUpperCase());
+      if (existing) {
+        // If existing, check SN duplicates
+        if (existing.trackingType === "SN" && type === "SN") {
+          const newSns = stock.split(/[;,]+/).map(s => s.trim()).filter(Boolean);
+          const dups = newSns.filter(sn => existing.serialNumbers.includes(sn));
+          if (dups.length > 0) return { valid: false, reason: `Duplicate SNs found: ${dups.join(", ")}` };
+        }
+        if (existing.trackingType !== type) return { valid: false, reason: `Conflict: Existing product is ${existing.trackingType}, import is ${type}` };
+      }
+
+      return { valid: true };
+    });
+
+    setImportData(data);
+    setValidationResults(results);
+  };
+
+  const handleImport = async () => {
+    setIsProcessing(true);
+    let successCount = 0;
+
+    for (let i = 0; i < importData.length; i++) {
+      if (!validationResults[i].valid) continue;
+      const row = importData[i];
+      const pn = String(row["Part Number"]).trim().toUpperCase();
+      const name = String(row["Product Name"]).trim();
+      const cat = String(row["Category"]).trim();
+      const sup = String(row["Supplier"]).trim();
+      const type = String(row["Tracking Type"]).trim().toUpperCase() as "SN" | "QTY";
+      const stock = String(row["Stock (QTY or SNs)"]).trim();
+
+      const existing = products.find(p => p.partNumber.toUpperCase() === pn);
+      if (existing) {
+        // Stock-In logic
+        if (type === "SN") {
+          const newSns = stock.split(/[;,]+/).map(s => s.trim()).filter(Boolean);
+          updateProduct(existing.id, { 
+            serialNumbers: [...existing.serialNumbers, ...newSns],
+            quantity: existing.quantity + newSns.length
+          });
+          addAuditLog({ 
+            userName: currentUser?.name || "System", 
+            userEmail: currentUser?.email || "", 
+            action: "Stock-In", 
+            itemName: existing.name, 
+            changeDetail: `Bulk Import: +${newSns.length} SNs` 
+          });
+        } else {
+          const qty = parseInt(stock) || 0;
+          updateProduct(existing.id, { quantity: existing.quantity + qty });
+          addAuditLog({ 
+            userName: currentUser?.name || "System", 
+            userEmail: currentUser?.email || "", 
+            action: "Stock-In", 
+            itemName: existing.name, 
+            changeDetail: `Bulk Import: +${qty} units` 
+          });
+        }
+      } else {
+        // Create new logic
+        const qty = type === "SN" ? stock.split(/[;,]+/).filter(Boolean).length : (parseInt(stock) || 0);
+        const sns = type === "SN" ? stock.split(/[;,]+/).map(s => s.trim()).filter(Boolean) : [];
+        addProduct({ 
+          partNumber: pn, 
+          name, 
+          category: cat, 
+          supplierName: sup || "N/A", 
+          trackingType: type, 
+          quantity: qty, 
+          serialNumbers: sns 
+        });
+        addAuditLog({ 
+          userName: currentUser?.name || "System", 
+          userEmail: currentUser?.email || "", 
+          action: "Created", 
+          itemName: name, 
+          changeDetail: `Bulk Import (${type})` 
+        });
+      }
+      successCount++;
+    }
+
+    toast.success(`Successfully imported ${successCount} items`);
+    setIsProcessing(false);
+    onClose();
+  };
+
+  const hasErrors = validationResults.some(r => !r.valid);
+  const canConfirm = importData.length > 0 && !hasErrors && !isProcessing;
+
+  return (
+    <Dialog open onOpenChange={onClose}>
+      <DialogContent className="max-w-3xl rounded-2xl max-h-[90vh] flex flex-col">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-[#0a1565]">
+              <FileSpreadsheet className="w-4 h-4 text-white" />
+            </div>
+            Bulk Import Products
+          </DialogTitle>
+        </DialogHeader>
+
+        <div className="flex-1 overflow-y-auto py-4 space-y-6">
+          {/* Step 1: Template */}
+          <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 flex items-center justify-between">
+            <div>
+              <p className="font-semibold text-slate-900">1. Download Template</p>
+              <p className="text-xs text-slate-500">Use this format to ensure successful import.</p>
+            </div>
+            <Button onClick={downloadTemplate} variant="outline" className="rounded-xl gap-2 bg-white">
+              <Download className="w-4 h-4" />Download .xlsx
+            </Button>
+          </div>
+
+          {/* Step 2: Upload */}
+          <div className="space-y-3">
+            <p className="font-semibold text-slate-900">2. Upload File</p>
+            <div className="border-2 border-dashed border-slate-200 rounded-xl p-8 text-center hover:border-[#0a1565] transition-colors relative">
+              <input 
+                type="file" 
+                accept=".xlsx,.csv" 
+                onChange={handleFileUpload} 
+                className="absolute inset-0 opacity-0 cursor-pointer"
+              />
+              <FileSpreadsheet className="w-10 h-10 mx-auto mb-2 text-slate-300" />
+              <p className="text-sm text-slate-500">Click or drag your CSV/Excel file here</p>
+            </div>
+          </div>
+
+          {/* Step 3: Preview */}
+          {importData.length > 0 && (
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <p className="font-semibold text-slate-900">3. Preview & Validation</p>
+                <span className={`text-xs font-bold px-2 py-1 rounded-full ${hasErrors ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-600'}`}>
+                  {hasErrors ? 'Errors Found' : 'All Rows Valid'}
+                </span>
+              </div>
+              <div className="border rounded-xl overflow-hidden overflow-x-auto">
+                <Table>
+                  <TableHeader className="bg-slate-50">
+                    <TableRow>
+                      <TableHead className="w-12">#</TableHead>
+                      <TableHead>Part Number</TableHead>
+                      <TableHead>Name</TableHead>
+                      <TableHead>Status</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {importData.map((row, idx) => (
+                      <TableRow key={idx} className={validationResults[idx]?.valid ? "" : "bg-red-50"}>
+                        <TableCell className="text-xs text-slate-400">{idx + 1}</TableCell>
+                        <TableCell className="font-mono text-xs">{row["Part Number"]}</TableCell>
+                        <TableCell className="text-xs font-medium">{row["Product Name"]}</TableCell>
+                        <TableCell>
+                          {validationResults[idx]?.valid ? (
+                            <span className="flex items-center gap-1 text-xs text-green-600 font-medium">
+                              <CheckCircle2 className="w-3 h-3" /> Ready
+                            </span>
+                          ) : (
+                            <span className="flex items-center gap-1 text-xs text-red-600 font-medium" title={validationResults[idx]?.reason}>
+                              <AlertCircle className="w-3 h-3" /> {validationResults[idx]?.reason}
+                            </span>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </div>
+          )}
+        </div>
+
+        <DialogFooter className="pt-4 border-t">
+          <Button variant="outline" className="rounded-xl" onClick={onClose} disabled={isProcessing}>Cancel</Button>
+          <Button 
+            onClick={handleImport}
+            disabled={!canConfirm}
+            className="rounded-xl text-white min-w-[140px]"
+            style={{ background: canConfirm ? "linear-gradient(135deg, #0a1565, #1229b3)" : "#e2e8f0" }}
+          >
+            {isProcessing ? "Processing..." : "Confirm Import"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 // ── Main Inventory Component ───────────────────────────────────────
 export function Inventory() {
   const { products, currentUser, getUserPermissions } = useAuth();
@@ -409,10 +654,12 @@ export function Inventory() {
   const perms = currentUser ? getUserPermissions(currentUser.id) : null;
   const canAdd = isSuperAdmin || (perms?.canAddStock ?? false);
   const canEdit = isSuperAdmin || (perms?.canStockIn ?? false); // use canStockIn as proxy for edit access
+  const canImport = isSuperAdmin || (perms?.canImportProducts ?? false);
 
   const [searchQuery, setSearchQuery] = useState("");
   const [editProduct, setEditProduct] = useState<Product | null>(null);
   const [isAddOpen, setIsAddOpen] = useState(false);
+  const [isImportOpen, setIsImportOpen] = useState(false);
 
   const filteredProducts = products.filter((p) =>
     p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -433,15 +680,26 @@ export function Inventory() {
             {products.length} part{products.length !== 1 ? "s" : ""} · {totalStock.toLocaleString()} total units
           </p>
         </div>
-        {canAdd && (
-          <Button
-            onClick={() => setIsAddOpen(true)}
-            className="rounded-xl gap-2 text-white"
-            style={{ background: "linear-gradient(135deg, #0a1565, #1229b3)" }}
-          >
-            <Plus className="w-4 h-4" />Add New Product
-          </Button>
-        )}
+        <div className="flex gap-2">
+          {canImport && (
+            <Button
+              onClick={() => setIsImportOpen(true)}
+              variant="outline"
+              className="rounded-xl gap-2 border-slate-200"
+            >
+              <FileSpreadsheet className="w-4 h-4" />Import Products
+            </Button>
+          )}
+          {canAdd && (
+            <Button
+              onClick={() => setIsAddOpen(true)}
+              className="rounded-xl gap-2 text-white"
+              style={{ background: "linear-gradient(135deg, #0a1565, #1229b3)" }}
+            >
+              <Plus className="w-4 h-4" />Add New Product
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* Search */}
@@ -606,6 +864,11 @@ export function Inventory() {
       {/* Add New Product Modal */}
       {isAddOpen && (
         <AddNewProductModal onClose={() => setIsAddOpen(false)} />
+      )}
+
+      {/* Import Products Modal */}
+      {isImportOpen && (
+        <ImportProductsModal onClose={() => setIsImportOpen(false)} />
       )}
     </div>
   );

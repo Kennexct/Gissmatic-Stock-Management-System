@@ -47,6 +47,7 @@ const superadminPermissions: Omit<UserPermissions, "userId"> = {
   canViewCustomers: true, canManageCustomers: true,
   canViewSuppliers: true, canManageSuppliers: true,
   canViewReports: true, canExportReports: true,
+  canImportProducts: true,
 };
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {

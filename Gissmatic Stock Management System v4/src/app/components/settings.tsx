@@ -46,6 +46,7 @@ const PERMISSION_GROUPS = [
       { key: "canStockIn", label: "Edit Products", desc: "Edit product details from inventory" },
       { key: "canOutStock", label: "Out Stock", desc: "Record outgoing stock movements" },
       { key: "canFreezeStock", label: "Freeze Stock", desc: "Freeze stock and manage freeze list" },
+      { key: "canImportProducts", label: "Import Products", desc: "Bulk import inventory from CSV/Excel" },
     ],
   },
   {
