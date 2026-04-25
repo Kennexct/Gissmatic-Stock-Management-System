@@ -112,15 +112,7 @@ export function GlobalActionsProvider({ children }: { children: React.ReactNode 
   const [addSnList, setAddSnList] = useState<string[]>([]);
   const [addQty, setAddQty] = useState("");
   const [addNote, setAddNote] = useState("");
-  // New product fields (when PN not found)
-  const [addIsNew, setAddIsNew] = useState(false);
-  const [newProdForm, setNewProdForm] = useState({ name: "", category: "", supplierName: "" });
-  const [isCustomCategory, setIsCustomCategory] = useState(false);
-  const [isCustomSupplier, setIsCustomSupplier] = useState(false);
   const [confirmAddOpen, setConfirmAddOpen] = useState(false);
-
-  const addIsSnMode = addSnList.length > 0 || addSnInput.trim() !== "";
-  const addIsQtyMode = addQty.trim() !== "";
 
   // ── Out Stock ──
   const [isOutOpen, setIsOutOpen] = useState(false);
@@ -185,7 +177,7 @@ export function GlobalActionsProvider({ children }: { children: React.ReactNode 
   };
 
   // ─── Reset helpers ───
-  const resetAdd = () => { setAddPn(""); setAddFoundProduct(null); setAddSnInput(""); setAddSnList([]); setAddQty(""); setAddNote(""); setAddIsNew(false); setNewProdForm({ name: "", category: "", trackingType: "QTY", supplierName: "" }); };
+  const resetAdd = () => { setAddPn(""); setAddFoundProduct(null); setAddSnInput(""); setAddSnList([]); setAddQty(""); setAddNote(""); };
   const resetOut = () => { setOutPn(""); setOutFoundProduct(null); setOutSelectedSns([]); setOutSnInput(""); setOutQty(""); setOutCustomerId(""); setOutNote(""); };
   const resetFreeze = () => { setFreezePn(""); setFreezeFoundProduct(null); setFreezeSelectedSns([]); setFreezeSnInput(""); setFreezeQty(""); setFreezeCustomerId(""); setFreezeNote(""); };
 
@@ -252,47 +244,26 @@ export function GlobalActionsProvider({ children }: { children: React.ReactNode 
 
   // ─── CONFIRM Add Stock ───
   const executeAddStock = async () => {
-    if (addIsNew) {
-      if (!newProdForm.name || !newProdForm.category || !newProdForm.supplierName) {
-        toast.error("Please fill in all product details"); return;
-      }
-      const trackingType = addIsSnMode ? "SN" : "QTY";
-
-      if (trackingType === "SN" && addSnList.length === 0) {
-        toast.error("Add at least one serial number, or clear the SN input to use Quantity tracking."); return;
-      }
-      if (trackingType === "QTY" && (!addQty || parseInt(addQty) <= 0)) {
-        toast.error("Enter a valid quantity"); return;
-      }
-      const qty = trackingType === "SN" ? addSnList.length : parseInt(addQty);
-      const opId = crud.startOperation("create", `Creating "${newProdForm.name}"…`);
+    if (!addFoundProduct) return;
+    if (addFoundProduct.trackingType === "SN") {
+      if (addSnList.length === 0) { toast.error("Add at least one serial number"); return; }
+      const dup = addSnList.find((sn) => addFoundProduct.serialNumbers.includes(sn));
+      if (dup) { toast.error(`SN "${dup}" already exists`); return; }
+      const opId = crud.startOperation("stock-in", `Adding ${addSnList.length} SN(s)…`);
       try {
-        await addProduct({ partNumber: addPn.trim(), name: newProdForm.name, category: newProdForm.category, trackingType, quantity: qty, serialNumbers: trackingType === "SN" ? [...addSnList] : [], supplierName: newProdForm.supplierName });
-        await addAuditLog({ userName: currentUser?.name || "Unknown", userEmail: currentUser?.email || "", action: "Created", itemName: newProdForm.name, changeDetail: trackingType === "SN" ? `+${addSnList.length} SNs` : `+${qty} QTY`, note: addNote });
-        crud.completeOperation(opId, `"${newProdForm.name}" created`);
-      } catch { crud.failOperation(opId, "Failed to create product"); }
+        await updateProduct(addFoundProduct.id, { serialNumbers: [...addFoundProduct.serialNumbers, ...addSnList], quantity: addFoundProduct.quantity + addSnList.length });
+        await addAuditLog({ userName: currentUser?.name || "Unknown", userEmail: currentUser?.email || "", action: "Stock-In", itemName: addFoundProduct.name, changeDetail: `+${addSnList.length} SN${addSnList.length > 1 ? "s" : ""}: ${addSnList.join(", ")}`, note: addNote });
+        crud.completeOperation(opId, `+${addSnList.length} SN(s) added`);
+      } catch { crud.failOperation(opId, "Failed to add stock"); }
     } else {
-      if (!addFoundProduct) return;
-      if (addFoundProduct.trackingType === "SN") {
-        if (addSnList.length === 0) { toast.error("Add at least one serial number"); return; }
-        const dup = addSnList.find((sn) => addFoundProduct.serialNumbers.includes(sn));
-        if (dup) { toast.error(`SN "${dup}" already exists`); return; }
-        const opId = crud.startOperation("stock-in", `Adding ${addSnList.length} SN(s)…`);
-        try {
-          await updateProduct(addFoundProduct.id, { serialNumbers: [...addFoundProduct.serialNumbers, ...addSnList], quantity: addFoundProduct.quantity + addSnList.length });
-          await addAuditLog({ userName: currentUser?.name || "Unknown", userEmail: currentUser?.email || "", action: "Stock-In", itemName: addFoundProduct.name, changeDetail: `+${addSnList.length} SN${addSnList.length > 1 ? "s" : ""}: ${addSnList.join(", ")}`, note: addNote });
-          crud.completeOperation(opId, `+${addSnList.length} SN(s) added`);
-        } catch { crud.failOperation(opId, "Failed to add stock"); }
-      } else {
-        const qty = parseInt(addQty);
-        if (isNaN(qty) || qty <= 0) { toast.error("Enter a valid quantity"); return; }
-        const opId = crud.startOperation("stock-in", `Adding ${qty} units…`);
-        try {
-          await updateProduct(addFoundProduct.id, { quantity: addFoundProduct.quantity + qty });
-          await addAuditLog({ userName: currentUser?.name || "Unknown", userEmail: currentUser?.email || "", action: "Stock-In", itemName: addFoundProduct.name, changeDetail: `+${qty} QTY`, note: addNote });
-          crud.completeOperation(opId, `+${qty} units added`);
-        } catch { crud.failOperation(opId, "Failed to add stock"); }
-      }
+      const qty = parseInt(addQty);
+      if (isNaN(qty) || qty <= 0) { toast.error("Enter a valid quantity"); return; }
+      const opId = crud.startOperation("stock-in", `Adding ${qty} units…`);
+      try {
+        await updateProduct(addFoundProduct.id, { quantity: addFoundProduct.quantity + qty });
+        await addAuditLog({ userName: currentUser?.name || "Unknown", userEmail: currentUser?.email || "", action: "Stock-In", itemName: addFoundProduct.name, changeDetail: `+${qty} QTY`, note: addNote });
+        crud.completeOperation(opId, `+${qty} units added`);
+      } catch { crud.failOperation(opId, "Failed to add stock"); }
     }
     setIsAddOpen(false);
     resetAdd();
@@ -399,17 +370,9 @@ export function GlobalActionsProvider({ children }: { children: React.ReactNode 
   };
 
   const canDoAddStock = () => {
-    if (!addFoundProduct && !addIsNew) return false;
-    if (addFoundProduct) {
-      if (addFoundProduct.trackingType === "SN") return addSnList.length > 0;
-      return !!(addQty && parseInt(addQty) > 0);
-    }
-    if (addIsNew) {
-      if (!newProdForm.name || !newProdForm.category || !newProdForm.supplierName) return false;
-      if (newProdForm.trackingType === "SN") return addSnList.length > 0;
-      return !!(addQty && parseInt(addQty) > 0);
-    }
-    return false;
+    if (!addFoundProduct) return false;
+    if (addFoundProduct.trackingType === "SN") return addSnList.length > 0;
+    return !!(addQty && parseInt(addQty) > 0);
   };
 
   const canDoOutStock = () => {
@@ -504,8 +467,8 @@ export function GlobalActionsProvider({ children }: { children: React.ReactNode 
                 <ArrowDownToLine className="w-5 h-5 text-white" />
               </div>
               <div>
-                <DialogTitle>Add New Product / Stock</DialogTitle>
-                <DialogDescription>Enter part number to add incoming stock or create a new product</DialogDescription>
+                <DialogTitle>Stock-In (Existing Product)</DialogTitle>
+                <DialogDescription>Enter an existing part number to add incoming stock</DialogDescription>
               </div>
             </div>
           </DialogHeader>
@@ -523,18 +486,16 @@ export function GlobalActionsProvider({ children }: { children: React.ReactNode 
               />
             </div>
 
-            {/* Not found → offer to create */}
-            {addPn.trim().length > 3 && !addFoundProduct && !addIsNew && (
-              <div className="rounded-xl p-3 border border-amber-200 bg-amber-50 flex items-center justify-between gap-3">
-                <p className="text-sm text-amber-700">Part number not found in inventory.</p>
-                <Button size="sm" variant="outline" className="rounded-lg text-xs shrink-0 border-amber-300 text-amber-700 hover:bg-amber-100" onClick={() => setAddIsNew(true)}>
-                  + Create New
-                </Button>
+            {/* Not found warning */}
+            {addPn.trim().length > 3 && !addFoundProduct && (
+              <div className="rounded-xl p-3 border border-amber-200 bg-amber-50 flex items-center gap-2">
+                <span className="text-amber-600 text-lg">⚠️</span>
+                <p className="text-sm text-amber-700">Part number not found. Please register new products via the main Inventory menu.</p>
               </div>
             )}
 
             {/* Existing product card */}
-            {addFoundProduct && !addIsNew && (
+            {addFoundProduct && (
               <>
                 <ProductCard product={addFoundProduct} />
                 {/* SN input */}
@@ -581,101 +542,8 @@ export function GlobalActionsProvider({ children }: { children: React.ReactNode 
               </>
             )}
 
-            {/* New product form */}
-            {addIsNew && (
-              <div className="space-y-4 rounded-xl p-5 border border-slate-200 bg-white shadow-sm mt-4">
-                <p className="text-sm font-semibold" style={{ color: "#0a1565" }}>New Product Details</p>
-                <div className="space-y-1.5">
-                  <Label htmlFor="np-name">Product Name *</Label>
-                  <Input id="np-name" placeholder="Enter product name" value={newProdForm.name} onChange={(e) => setNewProdForm({ ...newProdForm, name: e.target.value })} className="rounded-xl" />
-                </div>
-                
-                <div className="space-y-1.5">
-                  <div className="flex justify-between items-center">
-                    <Label>Category *</Label>
-                    <button 
-                      type="button" 
-                      onClick={() => { setIsCustomCategory(!isCustomCategory); setNewProdForm({...newProdForm, category: ""}); }} 
-                      className="text-xs font-semibold text-[#0a1565] hover:underline"
-                    >
-                      {isCustomCategory ? "Pick Existing" : "+ New Category"}
-                    </button>
-                  </div>
-                  {isCustomCategory ? (
-                    <Input placeholder="Type new category..." value={newProdForm.category} onChange={(e) => setNewProdForm({ ...newProdForm, category: e.target.value })} className="rounded-xl" autoFocus />
-                  ) : (
-                    <Select value={newProdForm.category} onValueChange={(v) => setNewProdForm({ ...newProdForm, category: v })}>
-                      <SelectTrigger className="rounded-xl"><SelectValue placeholder="Select a category" /></SelectTrigger>
-                      <SelectContent>{categories.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
-                    </Select>
-                  )}
-                </div>
-
-                <div className="space-y-1.5">
-                  <div className="flex justify-between items-center">
-                    <Label>Supplier</Label>
-                    <button 
-                      type="button" 
-                      onClick={() => { setIsCustomSupplier(!isCustomSupplier); setNewProdForm({...newProdForm, supplierName: ""}); }} 
-                      className="text-xs font-semibold text-[#0a1565] hover:underline"
-                    >
-                      {isCustomSupplier ? "Pick Existing" : "+ New Supplier"}
-                    </button>
-                  </div>
-                  {isCustomSupplier ? (
-                    <Input placeholder="Type new supplier name..." value={newProdForm.supplierName} onChange={(e) => setNewProdForm({ ...newProdForm, supplierName: e.target.value })} className="rounded-xl" autoFocus />
-                  ) : (
-                    <Select value={newProdForm.supplierName} onValueChange={(v) => setNewProdForm({ ...newProdForm, supplierName: v })}>
-                      <SelectTrigger className="rounded-xl"><SelectValue placeholder="Select supplier (optional)" /></SelectTrigger>
-                      <SelectContent>{suppliers.map((s) => <SelectItem key={s.id} value={s.name}>{s.name}</SelectItem>)}</SelectContent>
-                    </Select>
-                  )}
-                </div>
-
-                {/* Initial stock */}
-                <div className="pt-2 border-t border-slate-100 mt-4">
-                  <p className="text-sm font-medium mb-3 text-slate-800">Initial Stock Level (Choose SN or Quantity)</p>
-                  <div className="space-y-4">
-                    {!addIsQtyMode && (
-                      <div className="space-y-2">
-                        <Label className="text-xs text-slate-500 uppercase tracking-wider">Track by Serial Number</Label>
-                        <div className="flex gap-2">
-                          <Input placeholder="Enter SN..." value={addSnInput} onChange={(e) => setAddSnInput(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); handleAddSn(); } }} className="rounded-xl font-mono flex-1" />
-                          <Button type="button" variant="outline" className="rounded-xl shrink-0" onClick={handleAddSn}><Plus className="w-4 h-4" /></Button>
-                        </div>
-                        {addSnList.length > 0 && (
-                          <div className="flex flex-wrap gap-1.5 mt-1">
-                            {addSnList.map((sn) => (
-                              <span key={sn} className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-mono" style={{ background: "#f0fff4", color: "#0d6604", border: "1px solid #bbf7d0" }}>
-                                {sn}<button onClick={() => setAddSnList(addSnList.filter((s) => s !== sn))} className="ml-0.5 hover:text-red-500"><X className="w-3 h-3" /></button>
-                              </span>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    )}
-
-                    {!addIsSnMode && !addIsQtyMode && (
-                      <div className="relative flex items-center py-2">
-                        <div className="flex-grow border-t border-slate-200"></div>
-                        <span className="flex-shrink-0 mx-4 text-slate-400 text-xs uppercase font-medium">Or</span>
-                        <div className="flex-grow border-t border-slate-200"></div>
-                      </div>
-                    )}
-
-                    {!addIsSnMode && (
-                      <div className="space-y-2">
-                        <Label className="text-xs text-slate-500 uppercase tracking-wider">Track by Quantity</Label>
-                        <Input type="number" min="1" placeholder="Enter starting quantity..." value={addQty} onChange={(e) => setAddQty(e.target.value)} className="rounded-xl" />
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-            )}
-
             {/* Note */}
-            {(addFoundProduct || addIsNew) && (
+            {addFoundProduct && (
               <div className="space-y-1.5">
                 <Label htmlFor="add-note">Note <span className="text-slate-400 font-normal">(optional)</span></Label>
                 <Input id="add-note" placeholder="e.g. New shipment from supplier" value={addNote} onChange={(e) => setAddNote(e.target.value)} className="rounded-xl" />
@@ -707,7 +575,7 @@ export function GlobalActionsProvider({ children }: { children: React.ReactNode 
         icon={<ArrowDownToLine className="w-5 h-5 text-[#0a1565]" />}
         description={
           <div className="space-y-1">
-            {addFoundProduct && !addIsNew && (
+            {addFoundProduct && (
               <>
                 <p>Adding to: <strong>{addFoundProduct.name}</strong></p>
                 {addFoundProduct.trackingType === "SN"
@@ -715,7 +583,6 @@ export function GlobalActionsProvider({ children }: { children: React.ReactNode 
                   : <p>Quantity: <strong>+{addQty}</strong> units</p>}
               </>
             )}
-            {addIsNew && <p>Creating new product: <strong>{newProdForm.name}</strong> (Part #: {addPn})</p>}
           </div>
         }
         confirmLabel="Confirm Add Stock"
