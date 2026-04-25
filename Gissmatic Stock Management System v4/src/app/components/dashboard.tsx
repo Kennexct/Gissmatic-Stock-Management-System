@@ -292,7 +292,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
               {[
                 { label: "Customers", value: customers.length, emoji: "👤", page: "customers" },
                 { label: "Suppliers", value: suppliers.length, emoji: "🏭", page: "suppliers" },
-                { label: "Categories", value: categories.length, emoji: "🏷️", page: null },
+                { label: "Categories", value: categories.length, emoji: "🏷️", page: "settings" },
                 { label: "Total Movements", value: outgoingSales.length, emoji: "📦", page: "reports" },
               ].map((item) => (
                 <button
