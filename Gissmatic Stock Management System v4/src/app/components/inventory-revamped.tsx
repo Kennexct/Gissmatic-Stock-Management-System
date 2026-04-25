@@ -17,6 +17,7 @@ import {
 import { Label } from "./ui/label";
 import { useAuth } from "./auth-context";
 import { useQuickActions } from "./global-actions";
+import { useCrudProgress } from "./crud-progress";
 import { Product } from "../../lib/types";
 import { toast } from "sonner";
 import * as XLSX from "xlsx";
@@ -24,6 +25,7 @@ import * as XLSX from "xlsx";
 // ── Add New Product Modal ───────────────────────────────────────────
 function AddNewProductModal({ onClose }: { onClose: () => void }) {
   const { addProduct, addAuditLog, currentUser, categories, suppliers, products } = useAuth();
+  const crud = useCrudProgress();
   const [form, setForm] = useState({ name: "", pn: "", category: "", supplierName: "" });
   const [addSnInput, setAddSnInput] = useState("");
   const [addSnList, setAddSnList] = useState<string[]>([]);
@@ -59,9 +61,10 @@ function AddNewProductModal({ onClose }: { onClose: () => void }) {
     }
 
     const qty = trackingType === "SN" ? addSnList.length : parseInt(addQty);
+    const opId = crud.startOperation("create", `Creating "${form.name.trim()}"…`);
     addProduct({ partNumber: form.pn.trim().toUpperCase(), name: form.name.trim(), category: form.category, trackingType, quantity: qty, serialNumbers: trackingType === "SN" ? [...addSnList] : [], supplierName: form.supplierName });
     addAuditLog({ userName: currentUser?.name || "Unknown", userEmail: currentUser?.email || "", action: "Created", itemName: form.name.trim(), changeDetail: trackingType === "SN" ? `+${addSnList.length} SNs` : `+${qty} QTY` });
-    toast.success(`"${form.name.trim()}" created successfully`);
+    crud.completeOperation(opId, `"${form.name.trim()}" created`);
     onClose();
   };
 
@@ -184,8 +187,10 @@ function EditProductModal({
 }: {
   product: Product;
   onClose: () => void;
+  onDelete: () => void;
 }) {
-  const { updateProduct, deleteProduct, addAuditLog, currentUser, categories, auditLogs } = useAuth();
+  const { updateProduct, addAuditLog, currentUser, categories, auditLogs } = useAuth();
+  const crud = useCrudProgress();
   const [name, setName] = useState(product.name);
   const [description, setDescription] = useState(product.description || "");
   const [imageUrl, setImageUrl] = useState(product.imageUrl || "");
@@ -213,6 +218,7 @@ function EditProductModal({
   const handleSave = () => {
     if (!name.trim()) { toast.error("Product name is required"); return; }
     if (!category.trim()) { toast.error("Category is required"); return; }
+    const opId = crud.startOperation("update", `Updating "${name.trim()}"…`);
     updateProduct(product.id, {
       name: name.trim(),
       description: description.trim() || undefined,
@@ -227,7 +233,7 @@ function EditProductModal({
       itemName: name.trim(),
       changeDetail: "Product details updated",
     });
-    toast.success(`"${name.trim()}" updated successfully`);
+    crud.completeOperation(opId, `"${name.trim()}" updated`);
     onClose();
   };
 
@@ -394,11 +400,7 @@ function EditProductModal({
                 variant="destructive"
                 className="rounded-xl px-4"
                 onClick={() => {
-                  if (confirm(`Are you sure you want to delete "${product.name}"? This action is permanent.`)) {
-                    deleteProduct(product.id);
-                    onClose();
-                    toast.success("Product deleted successfully");
-                  }
+                  onDelete();
                 }}
               >
                 <Trash2 className="w-4 h-4 mr-1.5" />Delete
@@ -426,6 +428,7 @@ function ImportProductsModal({ onClose }: { onClose: () => void }) {
   const { addProduct, updateProduct, deleteProduct, addAuditLog, currentUser, categories, suppliers, products } = useAuth();
   const [importData, setImportData] = useState<any[]>([]);
   const [validationResults, setValidationResults] = useState<{valid: boolean; reason?: string}[]>([]);
+  const crud = useCrudProgress();
   const [isProcessing, setIsProcessing] = useState(false);
 
   const downloadTemplate = () => {
@@ -492,7 +495,7 @@ function ImportProductsModal({ onClose }: { onClose: () => void }) {
   };
 
   const handleImport = async () => {
-    setIsProcessing(true);
+    const opId = crud.startOperation("create", `Importing ${validRows.length} items…`);
     let successCount = 0;
 
     for (let i = 0; i < importData.length; i++) {
@@ -556,7 +559,7 @@ function ImportProductsModal({ onClose }: { onClose: () => void }) {
       successCount++;
     }
 
-    toast.success(`Successfully imported ${successCount} items`);
+    crud.completeOperation(opId, `Imported ${successCount} items`);
     setIsProcessing(false);
     onClose();
   };
@@ -679,8 +682,17 @@ function ImportProductsModal({ onClose }: { onClose: () => void }) {
 
 // ── Main Inventory Component ───────────────────────────────────────
 export function Inventory() {
-  const { products, currentUser, getUserPermissions } = useAuth();
+  const { products, currentUser, getUserPermissions, deleteProduct } = useAuth();
   const quickActions = useQuickActions();
+  const crud = useCrudProgress();
+
+  const [confirmConfig, setConfirmConfig] = useState<{
+    isOpen: boolean; title: string; desc: string; action: string; onConfirm: () => void;
+  } | null>(null);
+
+  const requestConfirm = (title: string, desc: string, action: string, onConfirm: () => void) => {
+    setConfirmConfig({ isOpen: true, title, desc, action, onConfirm });
+  };
 
   const isSuperAdmin = currentUser?.role === "superadmin";
   const perms = currentUser ? getUserPermissions(currentUser.id) : null;
@@ -890,6 +902,20 @@ export function Inventory() {
         <EditProductModal
           product={editProduct}
           onClose={() => setEditProduct(null)}
+          onDelete={() => {
+            const p = editProduct;
+            requestConfirm(
+              "Delete Product",
+              `Are you sure you want to delete "${p.name}"? This action is permanent and irreversible.`,
+              "Delete Product",
+              async () => {
+                const opId = crud.startOperation("delete", `Deleting "${p.name}"…`);
+                await deleteProduct(p.id);
+                setEditProduct(null);
+                crud.completeOperation(opId, `"${p.name}" deleted`);
+              }
+            );
+          }}
         />
       )}
       
@@ -902,6 +928,26 @@ export function Inventory() {
       {isImportOpen && (
         <ImportProductsModal onClose={() => setIsImportOpen(false)} />
       )}
+      {/* Universal Action Confirm */}
+      <Dialog open={!!confirmConfig?.isOpen} onOpenChange={(open) => !open && setConfirmConfig(null)}>
+        <DialogContent className="max-w-sm rounded-2xl">
+          <DialogHeader>
+            <DialogTitle>{confirmConfig?.title}</DialogTitle>
+            <DialogDescription>{confirmConfig?.desc}</DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" className="rounded-xl" onClick={() => setConfirmConfig(null)}>Cancel</Button>
+            <Button className="rounded-xl text-white" style={{ background: "linear-gradient(135deg, #0a1565, #1229b3)" }} onClick={() => {
+              if (confirmConfig) {
+                confirmConfig.onConfirm();
+                setConfirmConfig(null);
+              }
+            }}>
+              {confirmConfig?.action}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

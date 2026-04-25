@@ -697,9 +697,10 @@ export function Settings() {
                     style={{ background: "linear-gradient(135deg, #0a1565, #1229b3)" }}
                     onClick={() => {
                       if (newCategoryName.trim()) {
+                        const opId = crud.startOperation("create", `Adding category "${newCategoryName.trim()}"…`);
                         addCategory(newCategoryName);
                         setNewCategoryName("");
-                        toast.success(`Category "${newCategoryName}" added`);
+                        crud.completeOperation(opId, `Category added`);
                       } else {
                         toast.error("Please enter a category name");
                       }
@@ -732,8 +733,9 @@ export function Settings() {
                               `Are you sure you want to delete "${cat}"? This will not affect existing products but will remove it from the selection list.`,
                               "Delete",
                               () => {
+                                const opId = crud.startOperation("delete", `Removing "${cat}"…`);
                                 deleteCategory(cat);
-                                toast.success(`Category "${cat}" removed`);
+                                crud.completeOperation(opId, `Category removed`);
                               }
                             );
                           }}
