@@ -1,7 +1,8 @@
 import React, { useState } from "react";
 import {
   Settings as SettingsIcon, User, Bell, Shield,
-  Users, UserPlus, Trash2, AlertTriangle, ChevronDown, ChevronUp, Mail, Search, Database
+  Users, UserPlus, Trash2, AlertTriangle, ChevronDown, ChevronUp, Mail, Search, Database,
+  Grid2X2, PlusCircle
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
 import { Label } from "./ui/label";
@@ -19,7 +20,7 @@ import { UserRole, User as UserType, UserPermissions } from "../../lib/types";
 import { toast } from "sonner";
 import { supabase } from "../../lib/supabase";
 
-type SettingsTab = "profile" | "security" | "notifications" | "staff" | "data_inventory";
+type SettingsTab = "profile" | "security" | "notifications" | "staff" | "data_inventory" | "categories";
 
 const PERMISSION_GROUPS = [
   {
@@ -239,6 +240,8 @@ export function Settings() {
   const [userToDelete, setUserToDelete] = useState<UserType | null>(null);
   const [staffForm, setStaffForm] = useState({ name: "", email: "", role: "viewer" as UserRole });
   const [isCreating, setIsCreating] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState("");
+  const { categories, addCategory, deleteCategory } = useAuth();
 
   const [confirmConfig, setConfirmConfig] = useState<{
     isOpen: boolean; title: string; desc: string; action: string; onConfirm: () => void;
@@ -381,6 +384,7 @@ export function Settings() {
     { id: "security", label: "Security", icon: Shield },
     { id: "notifications", label: "Notifications", icon: Bell },
     { id: "staff", label: "Staff & Access", icon: Users },
+    { id: "categories", label: "Categories", icon: Grid2X2 },
   ];
   
   if (currentUser?.role === 'superadmin') {
@@ -654,6 +658,96 @@ export function Settings() {
                 })
               )}
             </div>
+          </div>
+        )}
+
+        {/* Categories Tab */}
+        {activeTab === "categories" && (
+          <div className="space-y-5">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="font-semibold" style={{ color: "#0a1565" }}>Product Categories</h3>
+                <p className="text-sm text-slate-500">Manage your organization's product groupings</p>
+              </div>
+            </div>
+
+            <Card className="rounded-2xl border-slate-100 shadow-sm overflow-hidden">
+              <CardHeader className="pb-4 bg-slate-50/50 border-b border-slate-100">
+                <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+                  <div className="relative flex-1">
+                    <Grid2X2 className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                    <Input 
+                      placeholder="New category name..." 
+                      className="pl-9 rounded-xl bg-white"
+                      value={newCategoryName}
+                      onChange={(e) => setNewCategoryName(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          if (newCategoryName.trim()) {
+                            addCategory(newCategoryName);
+                            setNewCategoryName("");
+                            toast.success(`Category "${newCategoryName}" added`);
+                          }
+                        }
+                      }}
+                    />
+                  </div>
+                  <Button 
+                    className="rounded-xl text-white gap-2"
+                    style={{ background: "linear-gradient(135deg, #0a1565, #1229b3)" }}
+                    onClick={() => {
+                      if (newCategoryName.trim()) {
+                        addCategory(newCategoryName);
+                        setNewCategoryName("");
+                        toast.success(`Category "${newCategoryName}" added`);
+                      } else {
+                        toast.error("Please enter a category name");
+                      }
+                    }}
+                  >
+                    <PlusCircle className="w-4 h-4" /> Add Category
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent className="p-0">
+                <div className="divide-y divide-slate-100">
+                  {categories.length === 0 ? (
+                    <div className="py-12 text-center text-slate-400">
+                      <Grid2X2 className="w-10 h-10 mx-auto mb-2 opacity-10" />
+                      <p>No categories defined yet</p>
+                    </div>
+                  ) : (
+                    categories.map((cat) => (
+                      <div key={cat} className="px-5 py-3.5 flex items-center justify-between hover:bg-slate-50/80 transition-colors">
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center text-[#0a1565]">
+                            <Grid2X2 className="w-4 h-4" />
+                          </div>
+                          <span className="font-medium text-slate-700">{cat}</span>
+                        </div>
+                        <button
+                          onClick={() => {
+                            requestConfirm(
+                              "Delete Category",
+                              `Are you sure you want to delete "${cat}"? This will not affect existing products but will remove it from the selection list.`,
+                              "Delete",
+                              () => {
+                                deleteCategory(cat);
+                                toast.success(`Category "${cat}" removed`);
+                              }
+                            );
+                          }}
+                          className="p-1.5 rounded-lg text-slate-300 hover:text-red-500 hover:bg-red-50 transition-all"
+                          title="Remove category"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </CardContent>
+            </Card>
           </div>
         )}
 

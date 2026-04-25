@@ -32,6 +32,7 @@ interface AuthContextType {
   addFrozenStock: (frozen: Omit<FrozenStock, "id" | "timestamp">) => void;
   releaseFrozenStock: (id: string, action: "confirm" | "cancel") => void;
   addCategory: (category: string) => void;
+  deleteCategory: (category: string) => void;
   setCurrency: (currency: string) => void;
   getUserPermissions: (userId: string) => UserPermissions;
   updateUserPermissions: (userId: string, updates: Partial<UserPermissions>) => void;
@@ -108,8 +109,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }));
         mappedProducts.sort((a, b) => new Date(b.lastUpdated).getTime() - new Date(a.lastUpdated).getTime());
         setProducts(mappedProducts);
-        const dbCategories = Array.from(new Set(mappedProducts.map(p => p.category).filter(Boolean))) as string[];
-        setCategories(prev => [...new Set([...prev, ...dbCategories])]);
+      }
+
+      // ── Categories ──
+      const { data: catData } = await supabase.from('categories').select('name');
+      if (catData && catData.length > 0) {
+        const cloudCategories = catData.map(c => c.name);
+        setCategories(prev => [...new Set([...prev, ...cloudCategories])]);
+      } else {
+        // Fallback: derive from products if categories table is empty
+        const { data: prodDataForCats } = await supabase.from('products').select('category');
+        if (prodDataForCats) {
+          const derived = Array.from(new Set(prodDataForCats.map(p => p.category).filter(Boolean))) as string[];
+          setCategories(prev => [...new Set([...prev, ...derived])]);
+        }
       }
 
       // ── Audit Logs ──
@@ -628,8 +641,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await supabase.from('frozen_stocks').delete().eq('id', id);
   };
 
-  const addCategory = (category: string) => {
-    if (!categories.includes(category)) setCategories([...categories, category]);
+  const addCategory = async (category: string) => {
+    const trimmed = category.trim();
+    if (!trimmed) return;
+    if (!categories.includes(trimmed)) {
+      setCategories(prev => [...prev, trimmed]);
+      // Sync to Supabase
+      await supabase.from('categories').insert({ name: trimmed });
+    }
+  };
+
+  const deleteCategory = async (category: string) => {
+    setCategories(prev => prev.filter(c => c !== category));
+    // Sync to Supabase
+    await supabase.from('categories').delete().eq('name', category);
   };
 
   const setCurrency = (newCurrency: string) => setCurrencyState(newCurrency);
@@ -689,7 +714,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         supabase.from('suppliers').delete().not('id', 'is', null),
         supabase.from('customers').delete().not('id', 'is', null),
         supabase.from('outgoing_sales').delete().not('id', 'is', null),
-        supabase.from('frozen_stocks').delete().not('id', 'is', null)
+        supabase.from('frozen_stocks').delete().not('id', 'is', null),
+        supabase.from('categories').delete().not('name', 'is', null)
       ]);
 
       // Wipe Local State
@@ -717,7 +743,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       currentUser, users, products, auditLogs, suppliers, customers, outgoingSales, frozenStocks,
       permissions, categories, currency, login, logout, updateProfile, updatePassword, addUser, deleteUser,
       addProduct, updateProduct, addAuditLog, addSupplier, updateSupplier, addCustomer, deleteCustomer,
-      addOutgoingSale, addFrozenStock, releaseFrozenStock, addCategory, setCurrency: setCurrencyState,
+      addOutgoingSale, addFrozenStock, releaseFrozenStock, addCategory, deleteCategory, setCurrency: setCurrencyState,
       getUserPermissions, updateUserPermissions, factoryReset
     }}>
       {children}
