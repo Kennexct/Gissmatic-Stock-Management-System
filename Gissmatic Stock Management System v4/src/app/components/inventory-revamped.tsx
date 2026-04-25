@@ -22,12 +22,15 @@ import { toast } from "sonner";
 // ── Add New Product Modal ───────────────────────────────────────────
 function AddNewProductModal({ onClose }: { onClose: () => void }) {
   const { addProduct, addAuditLog, currentUser, categories, suppliers, products } = useAuth();
-  const [form, setForm] = useState({ name: "", pn: "", category: "", trackingType: "QTY" as "SN" | "QTY", supplierName: "" });
+  const [form, setForm] = useState({ name: "", pn: "", category: "", supplierName: "" });
   const [addSnInput, setAddSnInput] = useState("");
   const [addSnList, setAddSnList] = useState<string[]>([]);
   const [addQty, setAddQty] = useState("");
   const [isCustomCategory, setIsCustomCategory] = useState(false);
   const [isCustomSupplier, setIsCustomSupplier] = useState(false);
+
+  const isSnMode = addSnList.length > 0 || addSnInput.trim() !== "";
+  const isQtyMode = addQty.trim() !== "";
 
   const handleAddSn = () => {
     const sn = addSnInput.trim();
@@ -41,19 +44,21 @@ function AddNewProductModal({ onClose }: { onClose: () => void }) {
     if (!form.name || !form.pn || !form.category) {
       toast.error("Please fill in all required product details"); return;
     }
-    if (form.trackingType === "SN" && addSnList.length === 0) {
-      toast.error("Add at least one serial number"); return;
+    const trackingType = isSnMode ? "SN" : "QTY";
+
+    if (trackingType === "SN" && addSnList.length === 0) {
+      toast.error("Add at least one serial number, or clear the SN input to use Quantity tracking."); return;
     }
-    if (form.trackingType === "QTY" && (!addQty || parseInt(addQty) <= 0)) {
+    if (trackingType === "QTY" && (!addQty || parseInt(addQty) <= 0)) {
       toast.error("Enter a valid quantity"); return;
     }
     if (products.find((p) => p.partNumber.toLowerCase() === form.pn.trim().toLowerCase())) {
       toast.error("Part number already exists in inventory"); return;
     }
 
-    const qty = form.trackingType === "SN" ? addSnList.length : parseInt(addQty);
-    addProduct({ partNumber: form.pn.trim().toUpperCase(), name: form.name.trim(), category: form.category, trackingType: form.trackingType, quantity: qty, serialNumbers: form.trackingType === "SN" ? [...addSnList] : [], supplierName: form.supplierName });
-    addAuditLog({ userName: currentUser?.name || "Unknown", userEmail: currentUser?.email || "", action: "Created", itemName: form.name.trim(), changeDetail: form.trackingType === "SN" ? `+${addSnList.length} SNs` : `+${qty} QTY` });
+    const qty = trackingType === "SN" ? addSnList.length : parseInt(addQty);
+    addProduct({ partNumber: form.pn.trim().toUpperCase(), name: form.name.trim(), category: form.category, trackingType, quantity: qty, serialNumbers: trackingType === "SN" ? [...addSnList] : [], supplierName: form.supplierName });
+    addAuditLog({ userName: currentUser?.name || "Unknown", userEmail: currentUser?.email || "", action: "Created", itemName: form.name.trim(), changeDetail: trackingType === "SN" ? `+${addSnList.length} SNs` : `+${qty} QTY` });
     toast.success(`"${form.name.trim()}" created successfully`);
     onClose();
   };
@@ -119,38 +124,43 @@ function AddNewProductModal({ onClose }: { onClose: () => void }) {
               </Select>
             )}
           </div>
-          <div className="space-y-1.5">
-            <Label>Tracking Type *</Label>
-            <Select value={form.trackingType} onValueChange={(v: "SN" | "QTY") => setForm({ ...form, trackingType: v })}>
-              <SelectTrigger className="rounded-xl"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="QTY">Quantity (bulk tracking)</SelectItem>
-                <SelectItem value="SN">Serial Number (track individual units)</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          
           <div className="pt-2 border-t border-slate-100">
-            <p className="text-sm font-medium mb-3 text-slate-800">Initial Stock Level</p>
-            {form.trackingType === "SN" ? (
-              <div className="space-y-2">
-                <div className="flex gap-2">
-                  <Input placeholder="Enter SN" value={addSnInput} onChange={(e) => setAddSnInput(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); handleAddSn(); } }} className="rounded-xl font-mono flex-1" />
-                  <Button type="button" variant="outline" className="rounded-xl shrink-0" onClick={handleAddSn}><Plus className="w-4 h-4" /></Button>
-                </div>
-                {addSnList.length > 0 && (
-                  <div className="flex flex-wrap gap-1.5">
-                    {addSnList.map((sn) => (
-                      <span key={sn} className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-mono" style={{ background: "#f0fff4", color: "#0d6604", border: "1px solid #bbf7d0" }}>
-                        {sn}<button onClick={() => setAddSnList(addSnList.filter((s) => s !== sn))}><X className="w-3 h-3 ml-0.5 hover:text-red-500" /></button>
-                      </span>
-                    ))}
+            <p className="text-sm font-medium mb-3 text-slate-800">Initial Stock Level (Choose SN or Quantity)</p>
+            <div className="space-y-4">
+              {!isQtyMode && (
+                <div className="space-y-2">
+                  <Label className="text-xs text-slate-500 uppercase tracking-wider">Track by Serial Number</Label>
+                  <div className="flex gap-2">
+                    <Input placeholder="Enter SN..." value={addSnInput} onChange={(e) => setAddSnInput(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); handleAddSn(); } }} className="rounded-xl font-mono flex-1" />
+                    <Button type="button" variant="outline" className="rounded-xl shrink-0" onClick={handleAddSn}><Plus className="w-4 h-4" /></Button>
                   </div>
-                )}
-              </div>
-            ) : (
-              <Input type="number" min="1" placeholder="Enter starting quantity" value={addQty} onChange={(e) => setAddQty(e.target.value)} className="rounded-xl" />
-            )}
+                  {addSnList.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5">
+                      {addSnList.map((sn) => (
+                        <span key={sn} className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-mono" style={{ background: "#f0fff4", color: "#0d6604", border: "1px solid #bbf7d0" }}>
+                          {sn}<button onClick={() => setAddSnList(addSnList.filter((s) => s !== sn))}><X className="w-3 h-3 ml-0.5 hover:text-red-500" /></button>
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {!isSnMode && !isQtyMode && (
+                <div className="relative flex items-center py-2">
+                  <div className="flex-grow border-t border-slate-200"></div>
+                  <span className="flex-shrink-0 mx-4 text-slate-400 text-xs uppercase font-medium">Or</span>
+                  <div className="flex-grow border-t border-slate-200"></div>
+                </div>
+              )}
+
+              {!isSnMode && (
+                <div className="space-y-2">
+                  <Label className="text-xs text-slate-500 uppercase tracking-wider">Track by Quantity</Label>
+                  <Input type="number" min="1" placeholder="Enter starting quantity..." value={addQty} onChange={(e) => setAddQty(e.target.value)} className="rounded-xl" />
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
