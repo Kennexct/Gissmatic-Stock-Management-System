@@ -9,7 +9,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "./ui/table";
 import {
-  Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle,
+  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from "./ui/dialog";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
@@ -184,6 +184,7 @@ function AddNewProductModal({ onClose }: { onClose: () => void }) {
 function EditProductModal({
   product,
   onClose,
+  onDelete,
 }: {
   product: Product;
   onClose: () => void;
