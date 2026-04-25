@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import {
   Search, Plus, Package2, AlertTriangle, Pencil, X, ImageOff, Clock, ChevronDown, ChevronUp,
-  FileSpreadsheet, Download, AlertCircle, CheckCircle2,
+  FileSpreadsheet, Download, AlertCircle, CheckCircle2, Trash2,
 } from "lucide-react";
 import { Input } from "./ui/input";
 import { Button } from "./ui/button";
@@ -185,7 +185,7 @@ function EditProductModal({
   product: Product;
   onClose: () => void;
 }) {
-  const { updateProduct, addAuditLog, currentUser, categories, auditLogs } = useAuth();
+  const { updateProduct, deleteProduct, addAuditLog, currentUser, categories, auditLogs } = useAuth();
   const [name, setName] = useState(product.name);
   const [description, setDescription] = useState(product.description || "");
   const [imageUrl, setImageUrl] = useState(product.imageUrl || "");
