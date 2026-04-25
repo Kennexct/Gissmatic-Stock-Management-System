@@ -406,6 +406,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
                   </div>
                 </button>
               ))}
+              </div>
             </CardContent>
           </Card>
 
