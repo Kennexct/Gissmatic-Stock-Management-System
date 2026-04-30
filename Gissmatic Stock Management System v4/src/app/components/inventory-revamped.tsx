@@ -45,6 +45,7 @@ function AddNewProductModal({ onClose }: { onClose: () => void }) {
     else onClose();
   };
   const isQtyMode = addQty.trim() !== "";
+  const isSnMode = addSnList.length > 0 || addSnInput.trim() !== "";
 
   const handleAddSn = () => {
     const sn = addSnInput.trim();
@@ -190,6 +191,17 @@ function AddNewProductModal({ onClose }: { onClose: () => void }) {
           </Button>
         </DialogFooter>
       </DialogContent>
+
+      <ConfirmDialog
+        open={showExitConfirm}
+        onClose={() => setShowExitConfirm(false)}
+        onConfirm={onClose}
+        title="Discard Changes?"
+        description="You have unsaved product details. Are you sure you want to exit? Your progress will be lost."
+        confirmLabel="Discard & Exit"
+        confirmStyle={{ background: "linear-gradient(135deg, #ef4444, #b91c1c)" }}
+        icon={<AlertTriangle className="w-5 h-5 text-red-500" />}
+      />
     </Dialog>
   );
 }
@@ -1099,17 +1111,6 @@ export function Inventory() {
             </Button>
           </DialogFooter>
         </DialogContent>
-
-        <ConfirmDialog
-          open={showExitConfirm}
-          onClose={() => setShowExitConfirm(false)}
-          onConfirm={onClose}
-          title="Discard Changes?"
-          description="You have unsaved product details. Are you sure you want to exit? Your progress will be lost."
-          confirmLabel="Discard & Exit"
-          confirmStyle={{ background: "linear-gradient(135deg, #ef4444, #b91c1c)" }}
-          icon={<AlertTriangle className="w-5 h-5 text-red-500" />}
-        />
       </Dialog>
     </div>
   );
