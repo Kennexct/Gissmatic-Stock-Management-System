@@ -930,7 +930,7 @@ export function Inventory() {
               ))
             ) : filteredProducts.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={8} className="text-center py-16 text-slate-400">
+                <TableCell colSpan={9} className="text-center py-16 text-slate-400">
                   <Package2 className="w-10 h-10 mx-auto mb-2 opacity-20" />
                   <p>{searchQuery ? `No results for "${searchQuery}"` : "No products found — add your first product"}</p>
                   {canAdd && !searchQuery && (

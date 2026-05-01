@@ -174,7 +174,6 @@ export function GlobalActionsProvider({ children }: { children: React.ReactNode 
     setAddPn(v);
     const found = lookupProduct(v);
     setAddFoundProduct(found || null);
-    setAddIsNew(false);
     setAddSnList([]);
     setAddQty("");
   };

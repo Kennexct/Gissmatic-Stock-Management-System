@@ -228,9 +228,6 @@ export function Settings() {
   const { currentUser, users, addUser, deleteUser, getUserPermissions, updateUserPermissions, updateProfile, updatePassword, factoryReset } = useAuth();
   const crud = useCrudProgress();
   const [activeTab, setActiveTab] = useState<SettingsTab>("profile");
-  const [notifLowStock, setNotifLowStock] = useState(true);
-  const [notifEmail, setNotifEmail] = useState(false);
-  const [notifAdjust, setNotifAdjust] = useState(true);
 
   const [isEditingProfile, setIsEditingProfile] = useState(false);
   const [isEditingSecurity, setIsEditingSecurity] = useState(false);
@@ -364,6 +361,13 @@ export function Settings() {
 
     if (result.success) {
       crud.completeOperation(opId, `Staff "${staffForm.name}" created`);
+      // Show the temporary password to the admin so they can share it with the new staff member
+      if (result.tempPassword) {
+        toast.success(
+          `Staff created! Temporary password: ${result.tempPassword} — Please share this securely. They will be required to change it on first login.`,
+          { duration: 15000 }
+        );
+      }
       setIsCreateModalOpen(false);
       setStaffForm({ name: "", email: "", role: "viewer" });
     } else {
@@ -557,27 +561,19 @@ export function Settings() {
                 </div>
               </div>
             </CardHeader>
-            <CardContent className="space-y-3">
-              {[
-                { label: "Low Stock Alerts", desc: "Notify when items fall below minimum stock", val: notifLowStock, set: setNotifLowStock },
-                { label: "Email Notifications", desc: "Receive daily summary reports via email", val: notifEmail, set: setNotifEmail },
-                { label: "Stock Adjustment Alerts", desc: "Alert when other users adjust inventory", val: notifAdjust, set: setNotifAdjust },
-              ].map((item) => (
-                <div key={item.label} className="flex items-center justify-between p-4 rounded-xl border border-slate-100 bg-slate-50/60 gap-3">
-                  <div className="min-w-0 flex-1">
-                    <p className="font-medium text-slate-900 text-sm">{item.label}</p>
-                    <p className="text-xs text-slate-400 mt-0.5 hidden sm:block">{item.desc}</p>
-                  </div>
-                  <PermissionToggle value={item.val} onChange={(v) => { 
-                    requestConfirm(
-                      `${v ? "Enable" : "Disable"} Notification`,
-                      `Are you sure you want to ${v ? "enable" : "disable"} ${item.label.toLowerCase()}?`,
-                      "Confirm",
-                      () => { item.set(v); toast.success(`${item.label} ${v ? "enabled" : "disabled"}`); }
-                    );
-                  }} />
+            <CardContent>
+              <div className="text-center py-12">
+                <div className="w-16 h-16 rounded-2xl mx-auto mb-4 flex items-center justify-center" style={{ background: "#f0f5ff" }}>
+                  <Bell className="h-7 w-7" style={{ color: "#0a1565" }} />
                 </div>
-              ))}
+                <h3 className="font-semibold text-slate-800 mb-1">Coming Soon</h3>
+                <p className="text-sm text-slate-400 max-w-xs mx-auto">
+                  Notification preferences including low stock alerts, email summaries, and adjustment alerts are currently in development.
+                </p>
+                <span className="inline-block mt-4 text-xs px-3 py-1.5 rounded-full font-medium" style={{ background: "#f0f5ff", color: "#0a1565" }}>
+                  Planned for next release
+                </span>
+              </div>
             </CardContent>
           </Card>
         )}

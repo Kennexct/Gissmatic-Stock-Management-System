@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from "react";
+import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from "react";
 import { User, Product, AuditLog, Supplier, Customer, OutgoingSale, UserPermissions, FrozenStock } from "../../lib/types";
 import { mockUsers, mockProducts, mockAuditLogs, mockSuppliers, mockCustomers, mockOutgoingSales, mockPermissions, defaultCategories, mockFrozenStocks } from "../../lib/mock-data";
 import { supabase, supabaseAdmin } from "../../lib/supabase";
@@ -19,7 +19,7 @@ interface AuthContextType {
   logout: () => Promise<void>;
   updateProfile: (name: string, email: string) => Promise<{ success: boolean; error?: string }>;
   updatePassword: (newPass: string) => Promise<{ success: boolean; error?: string }>;
-  addUser: (user: Omit<User, "id" | "createdAt">) => Promise<{ success: boolean; error?: string }>;
+  addUser: (user: Omit<User, "id" | "createdAt">) => Promise<{ success: boolean; error?: string; tempPassword?: string }>;
   deleteUser: (id: string) => void;
   addProduct: (product: Omit<Product, "id" | "lastUpdated">) => void;
   updateProduct: (id: string, updates: Partial<Product>) => void;
@@ -308,26 +308,44 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
-  useEffect(() => {
-    if (currentUser) localStorage.setItem("currentUser", JSON.stringify(currentUser));
-    localStorage.setItem("users", JSON.stringify(users));
-    localStorage.setItem("products_v2", JSON.stringify(products));
-    localStorage.setItem("auditLogs_v2", JSON.stringify(auditLogs));
-    localStorage.setItem("suppliers", JSON.stringify(suppliers));
-    localStorage.setItem("customers", JSON.stringify(customers));
-    localStorage.setItem("outgoingSales_v2", JSON.stringify(outgoingSales));
-    localStorage.setItem("frozenStocks", JSON.stringify(frozenStocks));
-    localStorage.setItem("userPermissions_v2", JSON.stringify(permissions));
-    localStorage.setItem("categories", JSON.stringify(categories));
-    localStorage.setItem("currency", currency);
+  // ── Debounced localStorage sync ──
+  // Instead of writing all state to localStorage on every single change,
+  // debounce to avoid performance issues with large datasets.
+  const localStorageTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const syncToLocalStorage = useCallback(() => {
+    if (localStorageTimer.current) clearTimeout(localStorageTimer.current);
+    localStorageTimer.current = setTimeout(() => {
+      try {
+        if (currentUser) localStorage.setItem("currentUser", JSON.stringify(currentUser));
+        localStorage.setItem("users", JSON.stringify(users));
+        localStorage.setItem("products_v2", JSON.stringify(products));
+        localStorage.setItem("auditLogs_v2", JSON.stringify(auditLogs));
+        localStorage.setItem("suppliers", JSON.stringify(suppliers));
+        localStorage.setItem("customers", JSON.stringify(customers));
+        localStorage.setItem("outgoingSales_v2", JSON.stringify(outgoingSales));
+        localStorage.setItem("frozenStocks", JSON.stringify(frozenStocks));
+        localStorage.setItem("userPermissions_v2", JSON.stringify(permissions));
+        localStorage.setItem("categories", JSON.stringify(categories));
+        localStorage.setItem("currency", currency);
+      } catch (e) {
+        console.error("localStorage sync failed (storage full?):", e);
+      }
+    }, 1000);
   }, [currentUser, users, products, auditLogs, suppliers, customers, outgoingSales, frozenStocks, permissions, categories, currency]);
+
+  useEffect(() => {
+    syncToLocalStorage();
+    return () => { if (localStorageTimer.current) clearTimeout(localStorageTimer.current); };
+  }, [syncToLocalStorage]);
 
   const login = async (email: string, password: string): Promise<{ success: boolean; needsSetup?: boolean; error?: string }> => {
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) return { success: false, error: error.message };
 
     const { error: profileError, data: profile } = await supabase.from('users').select('*').eq('id', data.user.id).single();
-    if (profileError || !profile) return { success: false, error: "Profile not found" };
+    if (profileError || !profile) {
+      return { success: false, error: profileError ? `Profile error: ${profileError.message} (${profileError.code})` : "No profile found for this account. Contact your administrator." };
+    }
 
     const userObj: User = {
       id: data.user.id,
@@ -381,11 +399,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return { success: true };
   };
 
-  const addUser = async (userData: Omit<User, "id" | "createdAt">): Promise<{ success: boolean; error?: string }> => {
+  const addUser = async (userData: Omit<User, "id" | "createdAt">): Promise<{ success: boolean; error?: string; tempPassword?: string }> => {
     // 1. Sign up on secondary client to avoid logging out the admin
+    // Generate a random temporary password — the user will be forced to change it on first login
+    const tempPassword = crypto.randomUUID().slice(0, 16) + '!Aa1';
     const { data: authData, error: authError } = await supabaseAdmin.auth.signUp({
       email: userData.email,
-      password: "Gissmatic2026",
+      password: tempPassword,
     });
     if (authError) return { success: false, error: authError.message };
     if (!authData.user) return { success: false, error: "User creation failed" };
@@ -425,7 +445,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
     setPermissions([...permissions, localPerms]);
 
-    return { success: true };
+    return { success: true, tempPassword };
   };
 
   const deleteUser = async (id: string) => {
@@ -434,6 +454,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Sync to Supabase
     await supabase.from('user_permissions').delete().eq('user_id', id);
     await supabase.from('users').delete().eq('id', id);
+    // WARNING: This does NOT delete the Supabase Auth record.
+    // The user can still log in with their credentials.
+    // To fully delete auth records, deploy a Supabase Edge Function
+    // that uses the service_role key to call supabase.auth.admin.deleteUser(id).
   };
 
   const addProduct = async (productData: Omit<Product, "id" | "lastUpdated">) => {

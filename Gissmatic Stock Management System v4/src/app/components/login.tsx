@@ -66,45 +66,6 @@ export function Login() {
     }
   };
 
-  const seedMasterAdmin = async () => {
-    setIsLoading(true);
-    let userId = null;
-    
-    // First, try to sign up
-    const { data: signUpData } = await supabase.auth.signUp({ email: 'admin@stockms.com', password: 'password123' });
-    
-    if (signUpData?.user) {
-      userId = signUpData.user.id;
-    } else {
-      // If they already exist from playing around, just log in to grab their ID
-      const { data: signInData } = await supabase.auth.signInWithPassword({ email: 'admin@stockms.com', password: 'password123' });
-      if (signInData?.user) {
-        userId = signInData.user.id;
-      }
-    }
-
-    if (userId) {
-      const { error } = await supabase.from('users').upsert({ 
-        id: userId, 
-        name: 'Master Admin', 
-        email: 'admin@stockms.com', 
-        role: 'superadmin', 
-        requires_password_change: false 
-      });
-      
-      if (error) {
-        toast.error("Error creating profile: " + error.message);
-      } else {
-        toast.success("Master Admin initialized & fixed in Supabase!");
-      }
-    } else {
-      toast.error("Could not create or find the auth record.");
-    }
-    setIsLoading(false);
-  };
-
-  const quickLogin = (demoEmail: string) => { setEmail(demoEmail); setPassword("password123"); setError(""); };
-
   return (
     <div className="min-h-screen flex">
       {/* Left brand panel */}
