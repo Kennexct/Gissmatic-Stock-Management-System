@@ -68,30 +68,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const storedUser = localStorage.getItem("currentUser");
-    const storedUsers = localStorage.getItem("users");
-    const storedProducts = localStorage.getItem("products_v2");
-    const storedLogs = localStorage.getItem("auditLogs_v2");
-    const storedSuppliers = localStorage.getItem("suppliers");
-    const storedCustomers = localStorage.getItem("customers");
-    const storedSales = localStorage.getItem("outgoingSales_v2");
-    const storedFrozen = localStorage.getItem("frozenStocks");
-    const storedPermissions = localStorage.getItem("userPermissions_v2");
-    const storedCategories = localStorage.getItem("categories");
-    const storedCurrency = localStorage.getItem("currency");
-
-    if (storedUser) setCurrentUser(JSON.parse(storedUser));
-    setUsers(storedUsers ? JSON.parse(storedUsers) : mockUsers);
-    setProducts(storedProducts ? JSON.parse(storedProducts) : mockProducts);
-    setAuditLogs(storedLogs ? JSON.parse(storedLogs) : mockAuditLogs);
-    setSuppliers(storedSuppliers ? JSON.parse(storedSuppliers) : mockSuppliers);
-    setCustomers(storedCustomers ? JSON.parse(storedCustomers) : mockCustomers);
-    setOutgoingSales(storedSales ? JSON.parse(storedSales) : mockOutgoingSales);
-    setFrozenStocks(storedFrozen ? JSON.parse(storedFrozen) : mockFrozenStocks);
-    setPermissions(storedPermissions ? JSON.parse(storedPermissions) : mockPermissions);
-    setCategories(storedCategories ? JSON.parse(storedCategories) : defaultCategories);
-    setCurrencyState(storedCurrency || "USD");
-
     // Fetch all cloud data from Supabase on Mount
     const fetchAllFromSupabase = async () => {
       // ── Products ──
@@ -308,35 +284,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
-  // ── Debounced localStorage sync ──
-  // Instead of writing all state to localStorage on every single change,
-  // debounce to avoid performance issues with large datasets.
-  const localStorageTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const syncToLocalStorage = useCallback(() => {
-    if (localStorageTimer.current) clearTimeout(localStorageTimer.current);
-    localStorageTimer.current = setTimeout(() => {
-      try {
-        if (currentUser) localStorage.setItem("currentUser", JSON.stringify(currentUser));
-        localStorage.setItem("users", JSON.stringify(users));
-        localStorage.setItem("products_v2", JSON.stringify(products));
-        localStorage.setItem("auditLogs_v2", JSON.stringify(auditLogs));
-        localStorage.setItem("suppliers", JSON.stringify(suppliers));
-        localStorage.setItem("customers", JSON.stringify(customers));
-        localStorage.setItem("outgoingSales_v2", JSON.stringify(outgoingSales));
-        localStorage.setItem("frozenStocks", JSON.stringify(frozenStocks));
-        localStorage.setItem("userPermissions_v2", JSON.stringify(permissions));
-        localStorage.setItem("categories", JSON.stringify(categories));
-        localStorage.setItem("currency", currency);
-      } catch (e) {
-        console.error("localStorage sync failed (storage full?):", e);
-      }
-    }, 1000);
-  }, [currentUser, users, products, auditLogs, suppliers, customers, outgoingSales, frozenStocks, permissions, categories, currency]);
-
-  useEffect(() => {
-    syncToLocalStorage();
-    return () => { if (localStorageTimer.current) clearTimeout(localStorageTimer.current); };
-  }, [syncToLocalStorage]);
+  // ── Removed debounced localStorage sync to improve performance and avoid 5MB quota ──
 
   const login = async (email: string, password: string): Promise<{ success: boolean; needsSetup?: boolean; error?: string }> => {
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });

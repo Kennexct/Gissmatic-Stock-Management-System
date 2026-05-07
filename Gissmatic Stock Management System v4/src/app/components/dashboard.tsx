@@ -13,6 +13,7 @@ import {
   PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend,
   AreaChart, Area, XAxis, YAxis, CartesianGrid
 } from "recharts";
+import { motion } from "motion/react";
 
 interface DashboardProps {
   onNavigate?: (page: string) => void;
@@ -228,7 +229,12 @@ export function Dashboard({ onNavigate }: DashboardProps) {
       </div>
 
       {/* Stats — clickable cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <motion.div 
+        className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4"
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5, staggerChildren: 0.1 }}
+      >
         {isLoading ? (
           Array.from({ length: 4 }).map((_, i) => (
             <div key={i} className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm space-y-3">
@@ -240,10 +246,11 @@ export function Dashboard({ onNavigate }: DashboardProps) {
             </div>
           ))
         ) : statCards.map((s) => (
-          <button
+          <motion.button
             key={s.title}
+            whileHover={{ y: -4, boxShadow: "0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)" }}
             onClick={s.onClick}
-            className="text-left rounded-2xl border border-slate-100 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all bg-white group"
+            className="text-left rounded-2xl border border-slate-100 shadow-sm transition-all bg-white group"
           >
             <div className="p-5">
               <div className="flex items-start justify-between">
@@ -261,41 +268,43 @@ export function Dashboard({ onNavigate }: DashboardProps) {
                 <ChevronRight className="w-3 h-3" style={{ color: "#16c60c" }} />
               </div>
             </div>
-          </button>
+          </motion.button>
         ))}
-      </div>
+      </motion.div>
 
       {/* Movement Trend Chart */}
-      <Card className="rounded-2xl border-slate-100 shadow-sm overflow-hidden">
-        <CardHeader className="pb-2">
-          <CardTitle className="text-base font-semibold" style={{ color: "#0a1565" }}>Stock Activity Trend (Last 7 Days)</CardTitle>
-        </CardHeader>
-        <CardContent className="h-64 pt-4">
-          <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={trendData}>
-              <defs>
-                <linearGradient id="colorIns" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#0a1565" stopOpacity={0.1}/>
-                  <stop offset="95%" stopColor="#0a1565" stopOpacity={0}/>
-                </linearGradient>
-                <linearGradient id="colorOuts" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#16c60c" stopOpacity={0.1}/>
-                  <stop offset="95%" stopColor="#16c60c" stopOpacity={0}/>
-                </linearGradient>
-              </defs>
-              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-              <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{fill: '#94a3b8', fontSize: 11}} dy={10} />
-              <YAxis axisLine={false} tickLine={false} tick={{fill: '#94a3b8', fontSize: 11}} />
-              <Tooltip 
-                contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
-                itemStyle={{ fontSize: '12px', fontWeight: 600 }}
-              />
-              <Area type="monotone" dataKey="ins" stroke="#0a1565" strokeWidth={3} fillOpacity={1} fill="url(#colorIns)" name="Stock-In" />
-              <Area type="monotone" dataKey="outs" stroke="#16c60c" strokeWidth={3} fillOpacity={1} fill="url(#colorOuts)" name="Stock-Out" />
-            </AreaChart>
-          </ResponsiveContainer>
-        </CardContent>
-      </Card>
+      <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.2, duration: 0.5 }}>
+        <Card className="rounded-2xl border-slate-100 shadow-sm overflow-hidden">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base font-semibold" style={{ color: "#0a1565" }}>Stock Activity Trend (Last 7 Days)</CardTitle>
+          </CardHeader>
+          <CardContent className="h-64 pt-4">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={trendData}>
+                <defs>
+                  <linearGradient id="colorIns" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#0a1565" stopOpacity={0.1}/>
+                    <stop offset="95%" stopColor="#0a1565" stopOpacity={0}/>
+                  </linearGradient>
+                  <linearGradient id="colorOuts" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#16c60c" stopOpacity={0.1}/>
+                    <stop offset="95%" stopColor="#16c60c" stopOpacity={0}/>
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{fill: '#94a3b8', fontSize: 11}} dy={10} />
+                <YAxis axisLine={false} tickLine={false} tick={{fill: '#94a3b8', fontSize: 11}} />
+                <Tooltip 
+                  contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
+                  itemStyle={{ fontSize: '12px', fontWeight: 600 }}
+                />
+                <Area type="monotone" dataKey="ins" stroke="#0a1565" strokeWidth={3} fillOpacity={1} fill="url(#colorIns)" name="Stock-In" />
+                <Area type="monotone" dataKey="outs" stroke="#16c60c" strokeWidth={3} fillOpacity={1} fill="url(#colorOuts)" name="Stock-Out" />
+              </AreaChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+      </motion.div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Recent Stock Movements */}
