@@ -343,7 +343,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (error) return { success: false, error: error.message };
 
     const { error: profileError, data: profile } = await supabase.from('users').select('*').eq('id', data.user.id).single();
-    if (profileError || !profile) return { success: false, error: "Profile not found" };
+    if (profileError || !profile) {
+      return { success: false, error: profileError ? `Profile error: ${profileError.message} (${profileError.code})` : "No profile found for this account. Contact your administrator." };
+    }
 
     const userObj: User = {
       id: data.user.id,

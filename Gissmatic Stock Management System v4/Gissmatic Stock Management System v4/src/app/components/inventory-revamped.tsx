@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import {
   Search, Plus, Package2, AlertTriangle, Pencil, X, ImageOff, Clock, ChevronDown, ChevronUp,
-  FileSpreadsheet, Download, AlertCircle, CheckCircle2, Trash2,
+  FileSpreadsheet, Download, AlertCircle, CheckCircle2, Trash2, FileText,
 } from "lucide-react";
 import { Input } from "./ui/input";
 import { Button } from "./ui/button";
@@ -14,6 +14,9 @@ import {
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "./ui/select";
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
+} from "./ui/dropdown-menu";
 import { Label } from "./ui/label";
 import { useAuth } from "./auth-context";
 import { useQuickActions, ConfirmDialog } from "./global-actions";
@@ -799,20 +802,23 @@ export function Inventory() {
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Button
-            onClick={exportToExcel}
-            variant="outline"
-            className="rounded-xl gap-2 border-slate-200 text-slate-600"
-          >
-            <Download className="w-4 h-4" />Excel
-          </Button>
-          <Button
-            onClick={exportToPDF}
-            variant="outline"
-            className="rounded-xl gap-2 border-slate-200 text-slate-600"
-          >
-            <FileSpreadsheet className="w-4 h-4" />PDF
-          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" className="rounded-xl gap-2 border-slate-200 text-slate-600">
+                <Download className="w-4 h-4" /> Export Report
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-48 rounded-xl">
+              <DropdownMenuItem onClick={exportToExcel} className="gap-2 cursor-pointer">
+                <FileSpreadsheet className="w-4 h-4 text-green-600" />
+                <span>Export as Excel</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={exportToPDF} className="gap-2 cursor-pointer">
+                <FileText className="w-4 h-4 text-red-600" />
+                <span>Export as PDF</span>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
           {canImport && (
             <Button
               onClick={() => setIsImportOpen(true)}
