@@ -1044,7 +1044,7 @@ export function Inventory() {
             )}
           </TableBody>
         </Table>
-      </div>
+      </motion.div>
 
       {/* Serial Numbers preview rows */}
       {filteredProducts.some((p) => p.trackingType === "SN" && p.serialNumbers.length > 0) && (
