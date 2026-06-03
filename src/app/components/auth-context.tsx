@@ -226,17 +226,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const updateProfile = async (name: string, email: string): Promise<{ success: boolean; error?: string }> => {
     if (!currentUser) return { success: false, error: "Not logged in" };
+
+    // 1. Update Auth Email first if changed
+    if (email !== currentUser.email) {
+      const { error: authError } = await supabase.auth.updateUser({ email });
+      if (authError) {
+        let msg = authError.message;
+        if (msg.toLowerCase().includes("rate limit exceeded") || msg.toLowerCase().includes("exceed")) {
+          msg = "Email update limit exceeded. Supabase only allows a few email changes per hour for security. Please check your inbox for verification links or try again later.";
+        }
+        return { success: false, error: msg };
+      }
+    }
+
+    // 2. If auth update succeeds (or wasn't needed), update public.users
+    const { error: dbError } = await supabase.from('users').update({ name, email }).eq('id', currentUser.id);
+    if (dbError) {
+      // If DB fails, we return error, but auth might have sent the email. This is an edge case.
+      return { success: false, error: dbError.message };
+    }
+
+    // 3. Update local state
     const updatedUser = { ...currentUser, name, email };
     setCurrentUser(updatedUser);
     setUsers(users.map(u => u.id === currentUser.id ? { ...u, name, email } : u));
-    
-    const { error: dbError } = await supabase.from('users').update({ name, email }).eq('id', currentUser.id);
-    if (dbError) return { success: false, error: dbError.message };
-    
-    if (email !== currentUser.email) {
-      const { error: authError } = await supabase.auth.updateUser({ email });
-      if (authError) return { success: false, error: authError.message };
-    }
     
     return { success: true };
   };
