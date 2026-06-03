@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState } from "react";
+import React, { createContext, useContext, useState, useEffect } from "react";
 import {
   Plus, ArrowUpFromLine, Snowflake, List, ChevronUp, ChevronDown,
   Package, AlertTriangle, X, Check, ArrowDownToLine, Trash2, ScanLine,
@@ -16,6 +16,7 @@ import { useAuth } from "./auth-context";
 import { useCrudProgress } from "./crud-progress";
 import { toast } from "sonner";
 import { Product, FrozenStock } from "../../lib/types";
+import { supabase } from "../../lib/supabase";
 
 interface QuickActionsContextType {
   openAddStock: () => void;
@@ -91,7 +92,7 @@ export function GlobalActionsProvider({ children }: { children: React.ReactNode 
   const {
     products, suppliers, customers, categories,
     addProduct, addAuditLog, addSupplier, addCustomer, addOutgoingSale,
-    updateProduct, addFrozenStock, releaseFrozenStock, frozenStocks,
+    addFrozenStock, releaseFrozenStock, frozenStocks,
     currentUser, addCategory, getUserPermissions,
   } = useAuth();
   const crud = useCrudProgress();
@@ -151,6 +152,29 @@ export function GlobalActionsProvider({ children }: { children: React.ReactNode 
   const isOutDirty = outPn.trim() !== "" || outSelectedSns.length > 0 || outQty.trim() !== "" || outNote.trim() !== "";
   const isFreezeDirty = freezePn.trim() !== "" || freezeSelectedSns.length > 0 || freezeQty.trim() !== "" || freezeNote.trim() !== "";
 
+  // ─── Async Product Search ───
+  const [productSuggestions, setProductSuggestions] = useState<Product[]>([]);
+
+  useEffect(() => {
+    const query = addPn || outPn || freezePn;
+    if (!query || query.length < 2) {
+      setProductSuggestions([]);
+      return;
+    }
+    const timer = setTimeout(async () => {
+      const { data } = await supabase.from('products')
+        .select('*')
+        .ilike('part_number', `%${query}%`)
+        .limit(10);
+      if (data) {
+        setProductSuggestions(data.map((db: any) => ({
+          id: db.id, partNumber: db.part_number, name: db.name, trackingType: db.tracking_type, quantity: db.quantity, serialNumbers: db.serial_numbers || [], category: db.category, supplierName: db.supplier_name, lastUpdated: db.last_updated
+        })));
+      }
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [addPn, outPn, freezePn]);
+
   const handleAddCloseAttempt = () => {
     if (isAddDirty) setExitConfirm({ isOpen: true, onDiscard: () => { setIsAddOpen(false); resetAdd(); setExitConfirm(null); } });
     else { setIsAddOpen(false); resetAdd(); }
@@ -167,30 +191,38 @@ export function GlobalActionsProvider({ children }: { children: React.ReactNode 
   };
 
   // ─── Part number lookup helpers ───
-  const lookupProduct = (pn: string) =>
-    products.find((p) => p.partNumber.toLowerCase() === pn.toLowerCase().trim());
+  const lookupProductAsync = async (pn: string): Promise<Product | null> => {
+    const exactMatch = productSuggestions.find(p => p.partNumber.toLowerCase() === pn.toLowerCase().trim());
+    if (exactMatch) return exactMatch;
+    
+    const { data } = await supabase.from('products').select('*').ilike('part_number', pn.trim()).single();
+    if (data) {
+      return { id: data.id, partNumber: data.part_number, name: data.name, trackingType: data.tracking_type, quantity: data.quantity, serialNumbers: data.serial_numbers || [], category: data.category, supplierName: data.supplier_name, lastUpdated: data.last_updated } as Product;
+    }
+    return null;
+  };
 
-  const handleAddPnChange = (v: string) => {
+  const handleAddPnChange = async (v: string) => {
     setAddPn(v);
-    const found = lookupProduct(v);
-    setAddFoundProduct(found || null);
+    const found = await lookupProductAsync(v);
+    setAddFoundProduct(found);
     setAddSnList([]);
     setAddQty("");
   };
 
-  const handleOutPnChange = (v: string) => {
+  const handleOutPnChange = async (v: string) => {
     setOutPn(v);
-    const found = lookupProduct(v);
-    setOutFoundProduct(found || null);
+    const found = await lookupProductAsync(v);
+    setOutFoundProduct(found);
     setOutSelectedSns([]);
     setOutSnInput("");
     setOutQty("");
   };
 
-  const handleFreezePnChange = (v: string) => {
+  const handleFreezePnChange = async (v: string) => {
     setFreezePn(v);
-    const found = lookupProduct(v);
-    setFreezeFoundProduct(found || null);
+    const found = await lookupProductAsync(v);
+    setFreezeFoundProduct(found);
     setFreezeSelectedSns([]);
     setFreezeQty("");
   };
@@ -270,7 +302,7 @@ export function GlobalActionsProvider({ children }: { children: React.ReactNode 
       if (dup) { toast.error(`SN "${dup}" already exists`); return; }
       const opId = crud.startOperation("stock-in", `Adding ${addSnList.length} SN(s)…`);
       try {
-        await updateProduct(addFoundProduct.id, { serialNumbers: [...addFoundProduct.serialNumbers, ...addSnList], quantity: addFoundProduct.quantity + addSnList.length });
+        await supabase.from('products').update({ serial_numbers: [...addFoundProduct.serialNumbers, ...addSnList], quantity: addFoundProduct.quantity + addSnList.length }).eq('id', addFoundProduct.id);
         await addAuditLog({ userName: currentUser?.name || "Unknown", userEmail: currentUser?.email || "", action: "Stock-In", itemName: addFoundProduct.name, changeDetail: `+${addSnList.length} SN${addSnList.length > 1 ? "s" : ""}: ${addSnList.join(", ")}`, note: addNote });
         crud.completeOperation(opId, `+${addSnList.length} SN(s) added`);
       } catch { crud.failOperation(opId, "Failed to add stock"); }
@@ -279,7 +311,7 @@ export function GlobalActionsProvider({ children }: { children: React.ReactNode 
       if (isNaN(qty) || qty <= 0) { toast.error("Enter a valid quantity"); return; }
       const opId = crud.startOperation("stock-in", `Adding ${qty} units…`);
       try {
-        await updateProduct(addFoundProduct.id, { quantity: addFoundProduct.quantity + qty });
+        await supabase.from('products').update({ quantity: addFoundProduct.quantity + qty }).eq('id', addFoundProduct.id);
         await addAuditLog({ userName: currentUser?.name || "Unknown", userEmail: currentUser?.email || "", action: "Stock-In", itemName: addFoundProduct.name, changeDetail: `+${qty} QTY`, note: addNote });
         crud.completeOperation(opId, `+${qty} units added`);
       } catch { crud.failOperation(opId, "Failed to add stock"); }
@@ -296,7 +328,7 @@ export function GlobalActionsProvider({ children }: { children: React.ReactNode 
       if (outSelectedSns.length === 0) { toast.error("Select at least one serial number"); return; }
       const opId = crud.startOperation("stock-out", `Moving out ${outSelectedSns.length} SN(s)…`);
       try {
-        await updateProduct(outFoundProduct.id, { serialNumbers: outFoundProduct.serialNumbers.filter((sn) => !outSelectedSns.includes(sn)), quantity: outFoundProduct.quantity - outSelectedSns.length });
+        await supabase.from('products').update({ serial_numbers: outFoundProduct.serialNumbers.filter((sn) => !outSelectedSns.includes(sn)), quantity: outFoundProduct.quantity - outSelectedSns.length }).eq('id', outFoundProduct.id);
         await addOutgoingSale({ customerId: customer?.id || "", customerName: customer?.name || "—", productId: outFoundProduct.id, productName: outFoundProduct.name, partNumber: outFoundProduct.partNumber, trackingType: "SN", serialNumbers: outSelectedSns, quantity: outSelectedSns.length, note: outNote });
         await addAuditLog({ userName: currentUser?.name || "Unknown", userEmail: currentUser?.email || "", action: "Stock-Out", itemName: outFoundProduct.name, changeDetail: `-${outSelectedSns.length} SN${outSelectedSns.length > 1 ? "s" : ""}: ${outSelectedSns.join(", ")}`, customerName: customer?.name, note: outNote });
         crud.completeOperation(opId, `${outSelectedSns.length} SN(s) moved out`);
@@ -307,7 +339,7 @@ export function GlobalActionsProvider({ children }: { children: React.ReactNode 
       if (qty > outFoundProduct.quantity) { toast.error(`Only ${outFoundProduct.quantity} units available`); return; }
       const opId = crud.startOperation("stock-out", `Moving out ${qty} units…`);
       try {
-        await updateProduct(outFoundProduct.id, { quantity: outFoundProduct.quantity - qty });
+        await supabase.from('products').update({ quantity: outFoundProduct.quantity - qty }).eq('id', outFoundProduct.id);
         await addOutgoingSale({ customerId: customer?.id || "", customerName: customer?.name || "—", productId: outFoundProduct.id, productName: outFoundProduct.name, partNumber: outFoundProduct.partNumber, trackingType: "QTY", serialNumbers: [], quantity: qty, note: outNote });
         await addAuditLog({ userName: currentUser?.name || "Unknown", userEmail: currentUser?.email || "", action: "Stock-Out", itemName: outFoundProduct.name, changeDetail: `-${qty} QTY`, customerName: customer?.name, note: outNote });
         crud.completeOperation(opId, `${qty} unit(s) moved out`);
@@ -324,7 +356,7 @@ export function GlobalActionsProvider({ children }: { children: React.ReactNode 
       if (freezeSelectedSns.length === 0) { toast.error("Select at least one serial number"); return; }
       const opId = crud.startOperation("freeze", `Freezing ${freezeSelectedSns.length} SN(s)…`);
       try {
-        await updateProduct(freezeFoundProduct.id, { serialNumbers: freezeFoundProduct.serialNumbers.filter((sn) => !freezeSelectedSns.includes(sn)), quantity: freezeFoundProduct.quantity - freezeSelectedSns.length });
+        await supabase.from('products').update({ serial_numbers: freezeFoundProduct.serialNumbers.filter((sn) => !freezeSelectedSns.includes(sn)), quantity: freezeFoundProduct.quantity - freezeSelectedSns.length }).eq('id', freezeFoundProduct.id);
         const customer = freezeCustomerId && freezeCustomerId !== "none" ? customers.find((c) => c.id === freezeCustomerId) : undefined;
         await addFrozenStock({ productId: freezeFoundProduct.id, productName: freezeFoundProduct.name, partNumber: freezeFoundProduct.partNumber, trackingType: "SN", serialNumbers: freezeSelectedSns, quantity: freezeSelectedSns.length, frozenBy: currentUser?.name || "Unknown", frozenByEmail: currentUser?.email || "", customerName: customer?.name || undefined, note: freezeNote || undefined });
         await addAuditLog({ userName: currentUser?.name || "Unknown", userEmail: currentUser?.email || "", action: "Frozen", itemName: freezeFoundProduct.name, changeDetail: `Frozen ${freezeSelectedSns.length} SN${freezeSelectedSns.length > 1 ? "s" : ""}: ${freezeSelectedSns.join(", ")}`, customerName: customer?.name || undefined, note: freezeNote });
@@ -336,7 +368,7 @@ export function GlobalActionsProvider({ children }: { children: React.ReactNode 
       if (qty > freezeFoundProduct.quantity) { toast.error(`Only ${freezeFoundProduct.quantity} units available`); return; }
       const opId = crud.startOperation("freeze", `Freezing ${qty} units…`);
       try {
-        await updateProduct(freezeFoundProduct.id, { quantity: freezeFoundProduct.quantity - qty });
+        await supabase.from('products').update({ quantity: freezeFoundProduct.quantity - qty }).eq('id', freezeFoundProduct.id);
         const customer = freezeCustomerId && freezeCustomerId !== "none" ? customers.find((c) => c.id === freezeCustomerId) : undefined;
         await addFrozenStock({ productId: freezeFoundProduct.id, productName: freezeFoundProduct.name, partNumber: freezeFoundProduct.partNumber, trackingType: "QTY", serialNumbers: [], quantity: qty, frozenBy: currentUser?.name || "Unknown", frozenByEmail: currentUser?.email || "", customerName: customer?.name || undefined, note: freezeNote || undefined });
         await addAuditLog({ userName: currentUser?.name || "Unknown", userEmail: currentUser?.email || "", action: "Frozen", itemName: freezeFoundProduct.name, changeDetail: `Frozen ${qty} QTY`, customerName: customer?.name || undefined, note: freezeNote });
@@ -412,7 +444,7 @@ export function GlobalActionsProvider({ children }: { children: React.ReactNode 
 
       {/* Global Datalist for Part Number Autocomplete */}
       <datalist id="products-list">
-        {products.map(p => (
+        {productSuggestions.map(p => (
           <option key={p.id} value={p.partNumber}>{p.name} ({p.quantity} in stock)</option>
         ))}
       </datalist>

@@ -5,8 +5,7 @@ import { supabase, supabaseAdmin } from "../../lib/supabase";
 
 interface AuthContextType {
   currentUser: User | null;
-  users: User[];
-  products: Product[];
+  users: any[];
   auditLogs: AuditLog[];
   suppliers: Supplier[];
   customers: Customer[];
@@ -19,12 +18,8 @@ interface AuthContextType {
   logout: () => Promise<void>;
   updateProfile: (name: string, email: string) => Promise<{ success: boolean; error?: string }>;
   updatePassword: (newPass: string) => Promise<{ success: boolean; error?: string }>;
-  addUser: (user: Omit<User, "id" | "createdAt">) => Promise<{ success: boolean; error?: string; tempPassword?: string }>;
-  deleteUser: (id: string) => void;
-  addProduct: (product: Omit<Product, "id" | "lastUpdated">) => void;
-  updateProduct: (id: string, updates: Partial<Product>) => void;
-  deleteProduct: (id: string) => Promise<void>;
-  addAuditLog: (log: Omit<AuditLog, "id" | "timestamp">) => void;
+  addUser: (email: string, name: string, role: string) => Promise<string>;
+  deleteUser: (id: string) => Promise<void>;
   addSupplier: (supplier: Omit<Supplier, "id" | "createdAt">) => void;
   updateSupplier: (id: string, updates: Partial<Supplier>) => void;
   addCustomer: (customer: Omit<Customer, "id" | "createdAt">) => void;
@@ -55,8 +50,7 @@ const superadminPermissions: Omit<UserPermissions, "userId"> = {
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
-  const [users, setUsers] = useState<User[]>([]);
-  const [products, setProducts] = useState<Product[]>([]);
+  const [users, setUsers] = useState<any[]>([]);
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
@@ -70,147 +64,77 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     // Fetch all cloud data from Supabase on Mount
     const fetchAllFromSupabase = async () => {
-      // ── Products ──
-      const { data: prodData } = await supabase.from('products').select('*');
-      if (prodData && prodData.length > 0) {
-        const mappedProducts: Product[] = prodData.map((db: any) => ({
-          id: db.id,
-          partNumber: db.part_number,
-          name: db.name,
-          description: db.description,
-          imageUrl: db.image_url,
-          category: db.category,
-          trackingType: db.tracking_type,
-          quantity: db.quantity,
-          serialNumbers: db.serial_numbers || [],
-          supplierName: db.supplier_name,
-          lastUpdated: db.last_updated || db.created_at || new Date().toISOString(),
-        }));
-        mappedProducts.sort((a, b) => new Date(b.lastUpdated).getTime() - new Date(a.lastUpdated).getTime());
-        setProducts(mappedProducts);
-      }
+      const [usersRes, logsRes, outRes, frozenRes, catsRes, suppRes, custRes, permRes] = await Promise.all([
+        supabase.from('users').select('*'),
+        supabase.from('audit_logs').select('*').order('timestamp', { ascending: false }).limit(500),
+        supabase.from('outgoing_sales').select('*').order('timestamp', { ascending: false }).limit(500),
+        supabase.from('frozen_stocks').select('*').order('timestamp', { ascending: false }),
+        supabase.from('categories').select('name'),
+        supabase.from('suppliers').select('*'),
+        supabase.from('customers').select('*'),
+        supabase.from('user_permissions').select('*')
+      ]);
 
-      // ── Categories ──
-      const { data: catData } = await supabase.from('categories').select('name');
-      if (catData && catData.length > 0) {
-        const cloudCategories = catData.map(c => c.name);
-        setCategories(prev => [...new Set([...prev, ...cloudCategories])]);
-      } else {
-        // Fallback: derive from products if categories table is empty
-        const { data: prodDataForCats } = await supabase.from('products').select('category');
-        if (prodDataForCats) {
-          const derived = Array.from(new Set(prodDataForCats.map(p => p.category).filter(Boolean))) as string[];
-          setCategories(prev => [...new Set([...prev, ...derived])]);
-        }
-      }
-
-      // ── Audit Logs ──
-      const { data: logData } = await supabase.from('audit_logs').select('*').order('timestamp', { ascending: false }).limit(500);
-      if (logData && logData.length > 0) {
-        setAuditLogs(logData.map((db: any) => ({
-          id: db.id,
-          timestamp: db.timestamp,
-          userName: db.user_name,
-          userEmail: db.user_email,
-          action: db.action,
-          itemName: db.item_name,
-          changeDetail: db.change_detail,
-          customerName: db.customer_name,
-          note: db.note,
+      if (usersRes.data) {
+        setUsers(usersRes.data.map((u: any) => ({
+          id: u.id, name: u.name, email: u.email, role: u.role || 'viewer', createdAt: u.created_at,
         })));
       }
 
-      // ── Outgoing Sales ──
-      const { data: salesData } = await supabase.from('outgoing_sales').select('*').order('timestamp', { ascending: false }).limit(500);
-      if (salesData && salesData.length > 0) {
-        setOutgoingSales(salesData.map((db: any) => ({
-          id: db.id,
-          timestamp: db.timestamp,
-          customerId: db.customer_id,
-          customerName: db.customer_name,
-          productId: db.product_id,
-          productName: db.product_name,
-          partNumber: db.part_number,
-          trackingType: db.tracking_type,
-          serialNumbers: db.serial_numbers || [],
-          quantity: db.quantity,
-          note: db.note || '',
+      if (logsRes.data) {
+        setAuditLogs(logsRes.data.map((db: any) => ({
+          id: db.id, timestamp: db.timestamp, userName: db.user_name, userEmail: db.user_email,
+          action: db.action, itemName: db.item_name, changeDetail: db.change_detail,
+          customerName: db.customer_name, note: db.note,
         })));
       }
 
-      // ── Frozen Stocks ──
-      const { data: frozenData } = await supabase.from('frozen_stocks').select('*').order('timestamp', { ascending: false });
-      if (frozenData && frozenData.length > 0) {
-        setFrozenStocks(frozenData.map((db: any) => ({
-          id: db.id,
-          timestamp: db.timestamp,
-          productId: db.product_id,
-          productName: db.product_name,
-          partNumber: db.part_number,
-          trackingType: db.tracking_type,
-          serialNumbers: db.serial_numbers || [],
-          quantity: db.quantity,
-          frozenBy: db.frozen_by,
-          frozenByEmail: db.frozen_by_email,
-          customerName: db.customer_name,
-          note: db.note,
+      if (outRes.data) {
+        setOutgoingSales(outRes.data.map((db: any) => ({
+          id: db.id, timestamp: db.timestamp, customerId: db.customer_id, customerName: db.customer_name,
+          productId: db.product_id, productName: db.product_name, partNumber: db.part_number,
+          trackingType: db.tracking_type, serialNumbers: db.serial_numbers || [],
+          quantity: db.quantity, note: db.note || '',
         })));
       }
 
-      // ── Suppliers ──
-      const { data: supplierData } = await supabase.from('suppliers').select('*').order('created_at', { ascending: false });
-      if (supplierData && supplierData.length > 0) {
-        setSuppliers(supplierData.map((db: any) => ({
-          id: db.id,
-          name: db.name,
-          phone: db.phone || '',
-          email: db.email || '',
-          address: db.address || '',
-          country: db.country || '',
-          createdAt: db.created_at,
+      if (frozenRes.data) {
+        setFrozenStocks(frozenRes.data.map((db: any) => ({
+          id: db.id, timestamp: db.timestamp, productId: db.product_id, productName: db.product_name,
+          partNumber: db.part_number, trackingType: db.tracking_type, serialNumbers: db.serial_numbers || [],
+          quantity: db.quantity, frozenBy: db.frozen_by, frozenByEmail: db.frozen_by_email,
+          customerName: db.customer_name, note: db.note,
         })));
       }
 
-      // ── Customers ──
-      const { data: customerData } = await supabase.from('customers').select('*').order('created_at', { ascending: false });
-      if (customerData && customerData.length > 0) {
-        setCustomers(customerData.map((db: any) => ({
-          id: db.id,
-          name: db.name,
-          email: db.email || '',
-          phone: db.phone || '',
-          address: db.address || '',
-          country: db.country || '',
-          createdAt: db.created_at,
-        })));
+      if (catsRes.data) {
+        setCategories(catsRes.data.map(c => c.name));
       }
-      // ── Users (Staff) ──
-      const { data: userData } = await supabase.from('users').select('*');
-      if (userData && userData.length > 0) {
-        setUsers(userData.map((db: any) => ({
-          id: db.id, name: db.name, email: db.email, role: db.role || 'viewer', createdAt: db.created_at,
+
+      if (suppRes.data) {
+        setSuppliers(suppRes.data.map((db: any) => ({
+          id: db.id, name: db.name, phone: db.phone || '', email: db.email || '',
+          address: db.address || '', country: db.country || '', createdAt: db.created_at,
         })));
       }
 
-      // ── User Permissions ──
-      const { data: permData } = await supabase.from('user_permissions').select('*');
-      if (permData && permData.length > 0) {
-        setPermissions(permData.map((db: any) => ({
+      if (custRes.data) {
+        setCustomers(custRes.data.map((db: any) => ({
+          id: db.id, name: db.name, email: db.email || '', phone: db.phone || '',
+          address: db.address || '', country: db.country || '', createdAt: db.created_at,
+        })));
+      }
+
+      if (permRes.data) {
+        setPermissions(permRes.data.map((db: any) => ({
           userId: db.user_id,
-          showQuickAddStock: db.show_quick_add_stock ?? false,
-          showQuickOutStock: db.show_quick_out_stock ?? false,
-          canAccessDashboard: db.can_access_dashboard ?? false,
-          canViewInventory: db.can_view_inventory ?? false,
-          canAddStock: db.can_add_stock ?? false,
-          canStockIn: db.can_stock_in ?? false,
-          canOutStock: db.can_out_stock ?? false,
-          canFreezeStock: db.can_freeze_stock ?? false,
-          canViewCustomers: db.can_view_customers ?? false,
-          canManageCustomers: db.can_manage_customers ?? false,
-          canViewSuppliers: db.can_view_suppliers ?? false,
-          canManageSuppliers: db.can_manage_suppliers ?? false,
-          canViewReports: db.can_view_reports ?? false,
-          canExportReports: db.can_export_reports ?? false,
+          showQuickAddStock: db.show_quick_add_stock ?? false, showQuickOutStock: db.show_quick_out_stock ?? false,
+          canAccessDashboard: db.can_access_dashboard ?? false, canViewInventory: db.can_view_inventory ?? false,
+          canAddStock: db.can_add_stock ?? false, canStockIn: db.can_stock_in ?? false,
+          canOutStock: db.can_out_stock ?? false, canFreezeStock: db.can_freeze_stock ?? false,
+          canViewCustomers: db.can_view_customers ?? false, canManageCustomers: db.can_manage_customers ?? false,
+          canViewSuppliers: db.can_view_suppliers ?? false, canManageSuppliers: db.can_manage_suppliers ?? false,
+          canViewReports: db.can_view_reports ?? false, canExportReports: db.can_export_reports ?? false,
         })));
       }
       setIsLoading(false);
@@ -218,7 +142,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     fetchAllFromSupabase();
   }, []);
 
-  // ── Supabase Realtime: sync all tables across devices ──
   useEffect(() => {
     const timers: Record<string, ReturnType<typeof setTimeout>> = {};
     const debounced = (key: string, fn: () => void) => {
@@ -227,14 +150,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
 
     const refetch = {
-      products: async () => {
-        const { data } = await supabase.from('products').select('*');
-        if (data) {
-          const m: Product[] = data.map((d: any) => ({ id: d.id, partNumber: d.part_number, name: d.name, description: d.description, imageUrl: d.image_url, category: d.category, trackingType: d.tracking_type, quantity: d.quantity, serialNumbers: d.serial_numbers || [], supplierName: d.supplier_name, lastUpdated: d.last_updated || d.created_at || new Date().toISOString() }));
-          m.sort((a, b) => new Date(b.lastUpdated).getTime() - new Date(a.lastUpdated).getTime());
-          setProducts(m);
-        }
-      },
       auditLogs: async () => {
         const { data } = await supabase.from('audit_logs').select('*').order('timestamp', { ascending: false }).limit(500);
         if (data) setAuditLogs(data.map((d: any) => ({ id: d.id, timestamp: d.timestamp, userName: d.user_name, userEmail: d.user_email, action: d.action, itemName: d.item_name, changeDetail: d.change_detail, customerName: d.customer_name, note: d.note })));
@@ -259,7 +174,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const channel = supabase
       .channel('gissmatic-realtime')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, () => debounced('products', refetch.products))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'audit_logs' }, () => debounced('logs', refetch.auditLogs))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'outgoing_sales' }, () => debounced('sales', refetch.sales))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'frozen_stocks' }, () => debounced('frozen', refetch.frozen))
@@ -267,9 +181,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'customers' }, () => debounced('customers', refetch.customers))
       .subscribe();
 
-    // Auto-refresh polling every 30s as realtime fallback
     const pollInterval = setInterval(() => {
-      refetch.products();
       refetch.auditLogs();
       refetch.sales();
       refetch.frozen();
@@ -284,59 +196,46 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
-  // ── Removed debounced localStorage sync to improve performance and avoid 5MB quota ──
-
   const login = async (email: string, password: string): Promise<{ success: boolean; needsSetup?: boolean; error?: string }> => {
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) return { success: false, error: error.message };
 
     const { error: profileError, data: profile } = await supabase.from('users').select('*').eq('id', data.user.id).single();
     if (profileError || !profile) {
-      return { success: false, error: profileError ? `Profile error: ${profileError.message} (${profileError.code})` : "No profile found for this account. Contact your administrator." };
+      return { success: false, error: profileError ? `Profile error: ${profileError.message}` : "No profile found." };
     }
-
-    const userObj: User = {
-      id: data.user.id,
-      name: profile.name,
-      email: profile.email,
-      role: profile.role as any,
-      createdAt: profile.created_at,
-    };
 
     if (profile.requires_password_change) {
       return { success: true, needsSetup: true };
     }
 
-    setCurrentUser(userObj);
+    setCurrentUser({
+      id: data.user.id,
+      name: profile.name,
+      email: profile.email,
+      role: profile.role,
+      createdAt: profile.created_at,
+    });
     return { success: true };
   };
 
   const logout = async () => { 
     await supabase.auth.signOut();
     setCurrentUser(null); 
-    localStorage.removeItem("currentUser"); 
   };
 
   const updateProfile = async (name: string, email: string): Promise<{ success: boolean; error?: string }> => {
     if (!currentUser) return { success: false, error: "Not logged in" };
-    // Update local state first (optimistic)
     const updatedUser = { ...currentUser, name, email };
     setCurrentUser(updatedUser);
-    // Update users array
     setUsers(users.map(u => u.id === currentUser.id ? { ...u, name, email } : u));
     
-    // Update Supabase DB
     const { error: dbError } = await supabase.from('users').update({ name, email }).eq('id', currentUser.id);
     if (dbError) return { success: false, error: dbError.message };
     
-    // Only update Supabase Auth if the email actually changed.
-    // This prevents hitting the "email rate limit exceeded" error when just updating the name.
     if (email !== currentUser.email) {
       const { error: authError } = await supabase.auth.updateUser({ email });
-      if (authError) {
-        console.error("Auth Update Error:", authError);
-        return { success: false, error: authError.message };
-      }
+      if (authError) return { success: false, error: authError.message };
     }
     
     return { success: true };
@@ -349,141 +248,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return { success: true };
   };
 
-  const addUser = async (userData: Omit<User, "id" | "createdAt">): Promise<{ success: boolean; error?: string; tempPassword?: string }> => {
-    // 1. Sign up on secondary client to avoid logging out the admin
-    // Generate a random temporary password — the user will be forced to change it on first login
+  const addUser = async (email: string, name: string, role: string): Promise<string> => {
     const tempPassword = crypto.randomUUID().slice(0, 16) + '!Aa1';
-    const { data: authData, error: authError } = await supabaseAdmin.auth.signUp({
-      email: userData.email,
-      password: tempPassword,
-    });
-    if (authError) return { success: false, error: authError.message };
-    if (!authData.user) return { success: false, error: "User creation failed" };
+    const { data: authData, error: authError } = await supabaseAdmin.auth.signUp({ email, password: tempPassword });
+    if (authError || !authData.user) throw new Error(authError?.message || "User creation failed");
 
-    // 2. Insert into users DB
-    const { error: dbError } = await supabase.from('users').insert({
-      id: authData.user.id,
-      name: userData.name,
-      email: userData.email,
-      role: userData.role,
-      requires_password_change: true
-    });
-    if (dbError) return { success: false, error: dbError.message };
-
-    // 3. Insert default permissions into DB (snake case)
-    const dbPerms = {
-      user_id: authData.user.id, show_quick_add_stock: false, show_quick_out_stock: false,
-      can_access_dashboard: false, can_view_inventory: true, can_add_stock: false,
-      can_stock_in: false, can_out_stock: false, can_freeze_stock: false,
-      can_view_customers: false, can_manage_customers: false,
-      can_view_suppliers: false, can_manage_suppliers: false,
-      can_view_reports: false, can_export_reports: false,
-    };
-    await supabase.from('user_permissions').insert(dbPerms);
-
-    // 4. Update local state
-    const newUser: User = { ...userData, id: authData.user.id, createdAt: new Date().toISOString() };
-    setUsers([...users, newUser]);
+    await supabase.from('users').insert({ id: authData.user.id, name, email, role, requires_password_change: true });
+    await supabase.from('user_permissions').insert({ user_id: authData.user.id });
     
-    const localPerms: UserPermissions = {
-      userId: authData.user.id, showQuickAddStock: false, showQuickOutStock: false,
-      canAccessDashboard: false, canViewInventory: true, canAddStock: false,
-      canStockIn: false, canOutStock: false, canFreezeStock: false,
-      canViewCustomers: false, canManageCustomers: false,
-      canViewSuppliers: false, canManageSuppliers: false,
-      canViewReports: false, canExportReports: false,
-    };
-    setPermissions([...permissions, localPerms]);
-
-    return { success: true, tempPassword };
+    setUsers([...users, { id: authData.user.id, name, email, role, createdAt: new Date().toISOString() }]);
+    return tempPassword;
   };
 
   const deleteUser = async (id: string) => {
     setUsers(users.filter((u) => u.id !== id));
     setPermissions(permissions.filter((p) => p.userId !== id));
-    // Sync to Supabase
     await supabase.from('user_permissions').delete().eq('user_id', id);
     await supabase.from('users').delete().eq('id', id);
-    // WARNING: This does NOT delete the Supabase Auth record.
-    // The user can still log in with their credentials.
-    // To fully delete auth records, deploy a Supabase Edge Function
-    // that uses the service_role key to call supabase.auth.admin.deleteUser(id).
-  };
-
-  const addProduct = async (productData: Omit<Product, "id" | "lastUpdated">) => {
-    // 0. If a custom supplier name was typed that isn't in our list, auto-create it
-    if (productData.supplierName) {
-      const exists = suppliers.some(s => s.name.toLowerCase() === productData.supplierName.toLowerCase());
-      if (!exists) {
-        await addSupplier({ name: productData.supplierName, phone: "", email: "", address: "", country: "" });
-      }
-    }
-    const tempId = `P${Date.now()}`;
-    const newProduct: Product = { ...productData, id: tempId, lastUpdated: new Date().toISOString() };
-    setProducts(prev => [newProduct, ...prev]);
-
-    // 2. Add to Custom Categories list instantly
-    if (productData.category && !categories.includes(productData.category)) {
-      setCategories(prev => [...prev, productData.category]);
-    }
-
-    // 3. Push to Supabase
-    const dbPayload = {
-      part_number: productData.partNumber,
-      name: productData.name,
-      description: productData.description || null,
-      image_url: productData.imageUrl || null,
-      category: productData.category,
-      tracking_type: productData.trackingType,
-      quantity: productData.quantity,
-      serial_numbers: productData.serialNumbers || [],
-      supplier_name: productData.supplierName || null,
-      last_updated: newProduct.lastUpdated
-    };
-
-    const { data, error } = await supabase.from('products').insert([dbPayload]).select().single();
-    if (error) {
-      console.error("Supabase insert error:", error);
-    } else if (data && data.id) {
-      // Replace temporary ID with actual real DB ID
-      setProducts(prev => prev.map(p => p.id === tempId ? { ...p, id: data.id } : p));
-    }
-  };
-
-  const updateProduct = async (id: string, updates: Partial<Product>) => {
-    // 1. Optimistic Local Update
-    const timestamp = new Date().toISOString();
-    setProducts(prev => prev.map((p) => p.id === id ? { ...p, ...updates, lastUpdated: timestamp } : p));
-
-    // 2. Update Custom Categories list
-    if (updates.category && !categories.includes(updates.category)) {
-      setCategories(prev => [...prev, updates.category]);
-    }
-
-    // 3. Sync to Supabase
-    const dbPayload: any = { last_updated: timestamp };
-    if (updates.partNumber !== undefined) dbPayload.part_number = updates.partNumber;
-    if (updates.name !== undefined) dbPayload.name = updates.name;
-    if (updates.description !== undefined) dbPayload.description = updates.description;
-    if (updates.imageUrl !== undefined) dbPayload.image_url = updates.imageUrl;
-    if (updates.category !== undefined) dbPayload.category = updates.category;
-    if (updates.trackingType !== undefined) dbPayload.tracking_type = updates.trackingType;
-    if (updates.quantity !== undefined) dbPayload.quantity = updates.quantity;
-    if (updates.serialNumbers !== undefined) dbPayload.serial_numbers = updates.serialNumbers;
-    if (updates.supplierName !== undefined) dbPayload.supplier_name = updates.supplierName;
-
-    const { error } = await supabase.from('products').update(dbPayload).eq('id', id);
-    if (error) console.error("Supabase update product error:", error);
-  };
-
-  const deleteProduct = async (id: string) => {
-    const product = products.find(p => p.id === id);
-    if (!product) return;
-    
-    setProducts(prev => prev.filter(p => p.id !== id));
-    // Log deletion
-    addAuditLog({
-      userName: currentUser?.name || "System",
       userEmail: currentUser?.email || "",
       action: "Deleted",
       itemName: product.name,
@@ -616,15 +397,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     if (action === "cancel") {
       // Return stock back to product
-      const product = products.find((p) => p.id === frozen.productId);
+      const { data: product } = await supabase.from('products').select('*').eq('id', frozen.productId).single();
       if (product) {
         if (frozen.trackingType === "SN") {
-          updateProduct(product.id, {
-            serialNumbers: [...product.serialNumbers, ...frozen.serialNumbers],
+          const currentSns = product.serial_numbers || [];
+          await supabase.from('products').update({
+            serial_numbers: [...currentSns, ...frozen.serialNumbers],
             quantity: product.quantity + frozen.serialNumbers.length,
-          });
+          }).eq('id', product.id);
         } else {
-          updateProduct(product.id, { quantity: product.quantity + frozen.quantity });
+          await supabase.from('products').update({ quantity: product.quantity + frozen.quantity }).eq('id', product.id);
         }
       }
     }
@@ -735,9 +517,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <AuthContext.Provider value={{
-      currentUser, users, products, auditLogs, suppliers, customers, outgoingSales, frozenStocks,
+      currentUser, users, auditLogs, suppliers, customers, outgoingSales, frozenStocks,
       permissions, categories, currency, login, logout, updateProfile, updatePassword, addUser, deleteUser,
-      addProduct, updateProduct, deleteProduct, addAuditLog, addSupplier, updateSupplier, addCustomer, deleteCustomer,
+      addAuditLog, addSupplier, updateSupplier, addCustomer, deleteCustomer,
       addOutgoingSale, addFrozenStock, releaseFrozenStock, addCategory, deleteCategory, setCurrency: setCurrencyState,
       getUserPermissions, updateUserPermissions, factoryReset, isLoading
     }}>

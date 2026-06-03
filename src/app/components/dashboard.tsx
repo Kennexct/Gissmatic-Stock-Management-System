@@ -14,6 +14,7 @@ import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid
 } from "recharts";
 import { motion } from "motion/react";
+import { useDashboardStats } from "../../lib/hooks/useDashboardStats";
 
 interface DashboardProps {
   onNavigate?: (page: string) => void;
@@ -71,17 +72,12 @@ function StatDetailModal({
 }
 
 export function Dashboard({ onNavigate }: DashboardProps) {
-  const { products, auditLogs, outgoingSales, customers, suppliers, categories, frozenStocks, currentUser, getUserPermissions, isLoading } = useAuth();
+  const { auditLogs, outgoingSales, frozenStocks, currentUser, getUserPermissions } = useAuth();
   const quickActions = useQuickActions();
+  const { totalParts, outOfStock, totalUnits, categoryData, lowStockProducts, isLoading: statsLoading } = useDashboardStats();
 
   // ── Chart Data Calculations ─────────────────────────────────────
   
-  // 1. Stock Distribution by Category (Pie Chart)
-  const categoryData = categories.map(cat => {
-    const count = products.filter(p => p.category === cat).length;
-    return { name: cat, value: count };
-  }).filter(c => c.value > 0).sort((a, b) => b.value - a.value).slice(0, 5);
-
   const COLORS = ['#0a1565', '#16c60c', '#0ea5e9', '#7c3aed', '#f59e0b'];
 
   // 2. Movement Trend (Last 7 Days)
@@ -103,11 +99,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
   const canOut = isSuperAdmin || (perms?.showQuickOutStock ?? false);
   const canFreeze = isSuperAdmin || (perms?.canFreezeStock ?? false);
 
-  const totalParts = products.length;
-  const outOfStock = products.filter((p) => p.quantity === 0).length;
-  const totalUnits = products.reduce((acc, p) => acc + p.quantity, 0);
   const recentMovements = outgoingSales.slice(0, 6);
-  const lowStockProducts = products.filter((p) => p.quantity === 0 || p.quantity < 5).sort((a, b) => a.quantity - b.quantity);
 
   const [modalContent, setModalContent] = useState<{ title: string; items: any[] } | null>(null);
 
@@ -119,15 +111,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
       Icon: Package,
       iconBg: "#0a156515",
       iconColor: "#0a1565",
-      onClick: () => setModalContent({
-        title: "All Part Numbers",
-        items: products.map((p) => ({
-          label: p.name,
-          sublabel: p.partNumber,
-          badge: p.trackingType === "SN" ? `${p.serialNumbers.length} SN` : `${p.quantity} QTY`,
-          badgeColor: p.quantity === 0 ? "#fff1f2" : "#f0f5ff",
-        })),
-      }),
+      onClick: () => {}, // Modal disabled for scalability
     },
     {
       title: "Out of Stock",
@@ -137,15 +121,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
       iconBg: "#fff7ed",
       iconColor: "#e05a00",
       valueColor: outOfStock > 0 ? "#e05a00" : undefined,
-      onClick: () => setModalContent({
-        title: "Out of Stock Items",
-        items: products.filter((p) => p.quantity === 0).map((p) => ({
-          label: p.name,
-          sublabel: p.partNumber,
-          badge: "Empty",
-          badgeColor: "#fff1f2",
-        })),
-      }),
+      onClick: () => {}, // Modal disabled for scalability
     },
     {
       title: "Total Units",
@@ -154,15 +130,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
       Icon: Boxes,
       iconBg: "#f0fff4",
       iconColor: "#0d9904",
-      onClick: () => setModalContent({
-        title: "Stock by Product",
-        items: [...products].sort((a, b) => b.quantity - a.quantity).map((p) => ({
-          label: p.name,
-          sublabel: p.partNumber,
-          badge: p.trackingType === "SN" ? `${p.serialNumbers.length} SN` : `${p.quantity} units`,
-          badgeColor: "#f0fff4",
-        })),
-      }),
+      onClick: () => {}, // Modal disabled for scalability
     },
     {
       title: "Frozen Stock",
@@ -462,17 +430,37 @@ export function Dashboard({ onNavigate }: DashboardProps) {
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-2">
-                {lowStockProducts.slice(0, 4).map((p) => (
-                  <div key={p.id} className="flex items-center justify-between bg-white/80 p-2.5 rounded-xl border border-orange-100">
-                    <div className="min-w-0">
-                      <p className="text-sm font-medium text-slate-900 truncate max-w-28">{p.name}</p>
-                      <p className="text-xs font-mono text-slate-400 truncate">{p.partNumber}</p>
-                    </div>
-                    <span className="text-xs font-bold px-2.5 py-1 rounded-full shrink-0" style={{ background: "#fff7ed", color: "#9a3a00", border: "1px solid #fed7aa" }}>
-                      {p.quantity === 0 ? "Empty" : `${p.quantity} left`}
-                    </span>
+                {statsLoading ? (
+                Array.from({ length: 4 }).map((_, i) => (
+                  <div key={i} className="flex items-center gap-4 border-b border-slate-50 pb-4 last:border-0 last:pb-0">
+                    <Skeleton className="w-10 h-10 rounded-xl" />
+                    <div className="flex-1 space-y-2"><Skeleton className="h-4 w-32" /><Skeleton className="h-3 w-20" /></div>
+                    <Skeleton className="w-16 h-6 rounded-full" />
                   </div>
-                ))}
+                ))
+              ) : lowStockProducts.length === 0 ? (
+                <div className="text-center py-8 text-slate-400">
+                  <CheckCircle className="w-8 h-8 mx-auto mb-2 opacity-20" />
+                  <p className="text-sm">All products are well stocked</p>
+                </div>
+              ) : (
+                lowStockProducts.map((p) => (
+                  <div key={p.id} className="flex items-center gap-4 border-b border-slate-50 pb-4 last:border-0 last:pb-0 hover:bg-slate-50/50 p-2 -mx-2 rounded-xl transition-colors">
+                    <div className="w-10 h-10 rounded-xl bg-orange-50 flex items-center justify-center shrink-0">
+                      <AlertTriangle className="w-5 h-5 text-orange-500" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-semibold text-slate-900 truncate">{p.name}</p>
+                      <p className="text-xs text-slate-500 font-mono mt-0.5">{p.part_number}</p>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-bold" style={{ background: p.quantity === 0 ? "#fff1f2" : "#fff7ed", color: p.quantity === 0 ? "#dc2626" : "#ea580c" }}>
+                        {p.quantity} {p.tracking_type === "SN" ? "SN" : "QTY"}
+                      </span>
+                    </div>
+                  </div>
+                ))
+              )}
               </CardContent>
             </Card>
           )}

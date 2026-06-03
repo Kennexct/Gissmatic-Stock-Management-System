@@ -29,10 +29,12 @@ import autoTable from "jspdf-autotable";
 import { Skeleton } from "./ui/skeleton";
 import { Checkbox } from "./ui/checkbox";
 import { motion } from "motion/react";
+import { useProducts } from "../../lib/hooks/useProducts";
+import { supabase } from "../../lib/supabase";
 
 // ── Add New Product Modal ───────────────────────────────────────────
-function AddNewProductModal({ onClose }: { onClose: () => void }) {
-  const { addProduct, addAuditLog, currentUser, categories, suppliers, products } = useAuth();
+function AddNewProductModal({ onClose, onSuccess }: { onClose: () => void, onSuccess: () => void }) {
+  const { addAuditLog, currentUser, categories, suppliers } = useAuth();
   const crud = useCrudProgress();
   const [form, setForm] = useState({ name: "", pn: "", category: "", supplierName: "" });
   const [addSnInput, setAddSnInput] = useState("");
@@ -77,10 +79,25 @@ function AddNewProductModal({ onClose }: { onClose: () => void }) {
 
     const qty = trackingType === "SN" ? addSnList.length : parseInt(addQty);
     const opId = crud.startOperation("create", `Creating "${form.name.trim()}"…`);
-    addProduct({ partNumber: form.pn.trim().toUpperCase(), name: form.name.trim(), category: form.category, trackingType, quantity: qty, serialNumbers: trackingType === "SN" ? [...addSnList] : [], supplierName: form.supplierName });
-    addAuditLog({ userName: currentUser?.name || "Unknown", userEmail: currentUser?.email || "", action: "Created", itemName: form.name.trim(), changeDetail: trackingType === "SN" ? `+${addSnList.length} SNs` : `+${qty} QTY` });
-    crud.completeOperation(opId, `"${form.name.trim()}" created`);
-    onClose();
+    
+    supabase.from('products').insert({
+      part_number: form.pn.trim().toUpperCase(),
+      name: form.name.trim(),
+      category: form.category,
+      tracking_type: trackingType,
+      quantity: qty,
+      serial_numbers: trackingType === "SN" ? [...addSnList] : [],
+      supplier_name: form.supplierName || null
+    }).then(({ error }) => {
+      if (error) {
+        crud.failOperation(opId, "Failed to create product");
+        return;
+      }
+      addAuditLog({ userName: currentUser?.name || "Unknown", userEmail: currentUser?.email || "", action: "Created", itemName: form.name.trim(), changeDetail: trackingType === "SN" ? `+${addSnList.length} SNs` : `+${qty} QTY` });
+      crud.completeOperation(opId, `"${form.name.trim()}" created`);
+      onSuccess();
+      onClose();
+    });
   };
 
   return (
@@ -211,16 +228,8 @@ function AddNewProductModal({ onClose }: { onClose: () => void }) {
 }
 
 // ── Edit Product Modal ──────────────────────────────────────────────
-function EditProductModal({
-  product,
-  onClose,
-  onDelete,
-}: {
-  product: Product;
-  onClose: () => void;
-  onDelete: () => void;
-}) {
-  const { updateProduct, addAuditLog, currentUser, categories, auditLogs } = useAuth();
+function EditProductModal({ product, onClose, onDelete, onSuccess }: { product: Product, onClose: () => void, onDelete: () => void, onSuccess: () => void }) {
+  const { addAuditLog, currentUser, auditLogs } = useAuth();
   const crud = useCrudProgress();
   const [name, setName] = useState(product.name);
   const [description, setDescription] = useState(product.description || "");
@@ -249,23 +258,31 @@ function EditProductModal({
   const handleSave = () => {
     if (!name.trim()) { toast.error("Product name is required"); return; }
     if (!category.trim()) { toast.error("Category is required"); return; }
+    
     const opId = crud.startOperation("update", `Updating "${name.trim()}"…`);
-    updateProduct(product.id, {
+    
+    supabase.from('products').update({
       name: name.trim(),
       description: description.trim() || undefined,
-      imageUrl: imageUrl.trim() || undefined,
+      image_url: imageUrl.trim() || undefined,
       category: category.trim(),
-      supplierName: supplierName.trim(),
+      supplier_name: supplierName.trim(),
+    }).eq('id', product.id).then(({ error }) => {
+      if (error) {
+        crud.failOperation(opId, "Failed to update product");
+        return;
+      }
+      addAuditLog({
+        userName: currentUser?.name || "Unknown",
+        userEmail: currentUser?.email || "",
+        action: "Updated",
+        itemName: name.trim(),
+        changeDetail: "Product details updated",
+      });
+      crud.completeOperation(opId, `"${name.trim()}" updated`);
+      onSuccess();
+      onClose();
     });
-    addAuditLog({
-      userName: currentUser?.name || "Unknown",
-      userEmail: currentUser?.email || "",
-      action: "Updated",
-      itemName: name.trim(),
-      changeDetail: "Product details updated",
-    });
-    crud.completeOperation(opId, `"${name.trim()}" updated`);
-    onClose();
   };
 
   return (
@@ -426,17 +443,13 @@ function EditProductModal({
 
         <DialogFooter className="flex flex-col sm:flex-row justify-between gap-3">
           <div className="flex gap-2 w-full sm:w-auto order-2 sm:order-1">
-            {(currentUser?.role === 'superadmin') && (
-              <Button
-                variant="destructive"
-                className="rounded-xl px-4"
-                onClick={() => {
-                  onDelete();
-                }}
-              >
-                <Trash2 className="w-4 h-4 mr-1.5" />Delete
-              </Button>
-            )}
+            <Button
+              variant="destructive"
+              className="rounded-xl px-4"
+              onClick={onDelete}
+            >
+              <Trash2 className="w-4 h-4 mr-1.5" />Delete
+            </Button>
           </div>
           <div className="flex gap-2 w-full sm:w-auto order-1 sm:order-2 justify-end">
             <Button variant="outline" className="rounded-xl" onClick={onClose}>Cancel</Button>
@@ -455,8 +468,8 @@ function EditProductModal({
 }
 
 // ── Import Products Modal ──────────────────────────────────────────
-function ImportProductsModal({ onClose }: { onClose: () => void }) {
-  const { addProduct, updateProduct, deleteProduct, addAuditLog, currentUser, categories, suppliers, products } = useAuth();
+function ImportProductsModal({ onClose, onSuccess }: { onClose: () => void, onSuccess: () => void }) {
+  const { addAuditLog, currentUser, categories, suppliers } = useAuth();
   const [importData, setImportData] = useState<any[]>([]);
   const [validationResults, setValidationResults] = useState<{valid: boolean; reason?: string}[]>([]);
   const crud = useCrudProgress();
@@ -497,26 +510,12 @@ function ImportProductsModal({ onClose }: { onClose: () => void }) {
       const cat = String(row["Category"] || "").trim();
       const sup = String(row["Supplier"] || "").trim();
       const type = String(row["Tracking Type"] || "").trim().toUpperCase();
-      const stock = String(row["Stock (QTY or SNs)"] || "").trim();
 
       if (!pn || !name || !cat || !type) return { valid: false, reason: "Missing required fields" };
       if (type !== "SN" && type !== "QTY") return { valid: false, reason: "Invalid Tracking Type (use SN or QTY)" };
 
-      // Strict Option A: Check category/supplier
       if (!categories.includes(cat)) return { valid: false, reason: `Category "${cat}" not found` };
       if (sup && sup !== "N/A" && !suppliers.some(s => s.name === sup)) return { valid: false, reason: `Supplier "${sup}" not found` };
-
-      // Check PN duplication logic
-      const existing = products.find(p => p.partNumber.toUpperCase() === pn.toUpperCase());
-      if (existing) {
-        // If existing, check SN duplicates
-        if (existing.trackingType === "SN" && type === "SN") {
-          const newSns = stock.split(/[;,]+/).map(s => s.trim()).filter(Boolean);
-          const dups = newSns.filter(sn => existing.serialNumbers.includes(sn));
-          if (dups.length > 0) return { valid: false, reason: `Duplicate SNs found: ${dups.join(", ")}` };
-        }
-        if (existing.trackingType !== type) return { valid: false, reason: `Conflict: Existing product is ${existing.trackingType}, import is ${type}` };
-      }
 
       return { valid: true };
     });
@@ -526,6 +525,7 @@ function ImportProductsModal({ onClose }: { onClose: () => void }) {
   };
 
   const handleImport = async () => {
+    const validRows = importData.filter((_, i) => validationResults[i]?.valid);
     const opId = crud.startOperation("create", `Importing ${validRows.length} items…`);
     let successCount = 0;
 
@@ -539,15 +539,16 @@ function ImportProductsModal({ onClose }: { onClose: () => void }) {
       const type = String(row["Tracking Type"]).trim().toUpperCase() as "SN" | "QTY";
       const stock = String(row["Stock (QTY or SNs)"]).trim();
 
-      const existing = products.find(p => p.partNumber.toUpperCase() === pn);
+      const { data: existing } = await supabase.from('products').select('*').ilike('part_number', pn).single();
+      
       if (existing) {
-        // Stock-In logic
         if (type === "SN") {
           const newSns = stock.split(/[;,]+/).map(s => s.trim()).filter(Boolean);
-          updateProduct(existing.id, { 
-            serialNumbers: [...existing.serialNumbers, ...newSns],
+          const existingSns = existing.serial_numbers || [];
+          await supabase.from('products').update({ 
+            serial_numbers: [...existingSns, ...newSns],
             quantity: existing.quantity + newSns.length
-          });
+          }).eq('id', existing.id);
           addAuditLog({ 
             userName: currentUser?.name || "System", 
             userEmail: currentUser?.email || "", 
@@ -557,7 +558,7 @@ function ImportProductsModal({ onClose }: { onClose: () => void }) {
           });
         } else {
           const qty = parseInt(stock) || 0;
-          updateProduct(existing.id, { quantity: existing.quantity + qty });
+          await supabase.from('products').update({ quantity: existing.quantity + qty }).eq('id', existing.id);
           addAuditLog({ 
             userName: currentUser?.name || "System", 
             userEmail: currentUser?.email || "", 
@@ -567,17 +568,16 @@ function ImportProductsModal({ onClose }: { onClose: () => void }) {
           });
         }
       } else {
-        // Create new logic
         const qty = type === "SN" ? stock.split(/[;,]+/).filter(Boolean).length : (parseInt(stock) || 0);
         const sns = type === "SN" ? stock.split(/[;,]+/).map(s => s.trim()).filter(Boolean) : [];
-        addProduct({ 
-          partNumber: pn, 
+        await supabase.from('products').insert({ 
+          part_number: pn, 
           name, 
           category: cat, 
-          supplierName: sup || "N/A", 
-          trackingType: type, 
+          supplier_name: sup || "N/A", 
+          tracking_type: type, 
           quantity: qty, 
-          serialNumbers: sns 
+          serial_numbers: sns 
         });
         addAuditLog({ 
           userName: currentUser?.name || "System", 
@@ -592,6 +592,7 @@ function ImportProductsModal({ onClose }: { onClose: () => void }) {
 
     crud.completeOperation(opId, `Imported ${successCount} items`);
     setIsProcessing(false);
+    onSuccess();
     onClose();
   };
 
@@ -612,7 +613,6 @@ function ImportProductsModal({ onClose }: { onClose: () => void }) {
         </DialogHeader>
 
         <div className="flex-1 overflow-y-auto py-4 space-y-6">
-          {/* Step 1: Template */}
           <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 flex items-center justify-between">
             <div>
               <p className="font-semibold text-slate-900">1. Download Template</p>
@@ -623,7 +623,6 @@ function ImportProductsModal({ onClose }: { onClose: () => void }) {
             </Button>
           </div>
 
-          {/* Step 2: Upload */}
           <div className="space-y-3">
             <p className="font-semibold text-slate-900">2. Upload File</p>
             <div className="border-2 border-dashed border-slate-200 rounded-xl p-8 text-center hover:border-[#0a1565] transition-colors relative">
@@ -638,7 +637,6 @@ function ImportProductsModal({ onClose }: { onClose: () => void }) {
             </div>
           </div>
 
-          {/* Step 3: Preview */}
           {importData.length > 0 && (
             <div className="space-y-3">
               <div className="flex items-center justify-between">
@@ -713,7 +711,7 @@ function ImportProductsModal({ onClose }: { onClose: () => void }) {
 
 // ── Main Inventory Component ───────────────────────────────────────
 export function Inventory() {
-  const { products, currentUser, getUserPermissions, deleteProduct, isLoading } = useAuth();
+  const { currentUser, getUserPermissions } = useAuth();
   const quickActions = useQuickActions();
   const crud = useCrudProgress();
 
@@ -736,13 +734,15 @@ export function Inventory() {
   const [editProduct, setEditProduct] = useState<Product | null>(null);
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [isImportOpen, setIsImportOpen] = useState(false);
+  
+  const [page, setPage] = useState(1);
+  const pageSize = 50;
 
-  const filteredProducts = products.filter((p) =>
-    p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    p.partNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    p.category.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    p.serialNumbers.some((sn) => sn.toLowerCase().includes(searchQuery.toLowerCase()))
-  );
+  const { products: filteredProducts, totalCount, isLoading, refetch } = useProducts({
+    page,
+    pageSize,
+    searchQuery
+  });
 
   const totalStock = products.reduce((a, p) => a + p.quantity, 0);
 
@@ -847,7 +847,10 @@ export function Inventory() {
         <Input
           placeholder="Search by name, part number, S/N or category…"
           value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
+          onChange={(e) => {
+            setSearchQuery(e.target.value);
+            setPage(1); // Reset page on search
+          }}
           className="pl-10 rounded-xl bg-white border-slate-200 h-10"
         />
       </div>
@@ -879,9 +882,10 @@ export function Inventory() {
                     async () => {
                       const opId = crud.startOperation("delete", `Deleting ${selectedIds.length} items…`);
                       try {
-                        await Promise.all(selectedIds.map(id => deleteProduct(id)));
+                        await Promise.all(selectedIds.map(id => supabase.from('products').delete().eq('id', id)));
                         setSelectedIds([]);
                         crud.completeOperation(opId, `${selectedIds.length} items deleted`);
+                        refetch();
                       } catch {
                         crud.failOperation(opId, "Failed to delete some items");
                       }
@@ -1048,6 +1052,19 @@ export function Inventory() {
         </Table>
         </div>
 
+        {/* Desktop Pagination Controls */}
+        {totalCount > pageSize && (
+          <div className="hidden md:flex items-center justify-between py-4 px-6 border-t border-slate-100 bg-slate-50/50">
+            <p className="text-sm text-slate-500 font-medium">
+              Showing <span className="font-bold text-[#0a1565]">{(page - 1) * pageSize + 1}</span> to <span className="font-bold text-[#0a1565]">{Math.min(page * pageSize, totalCount)}</span> of <span className="font-bold text-[#0a1565]">{totalCount}</span> entries
+            </p>
+            <div className="flex items-center gap-2">
+              <Button variant="outline" size="sm" className="rounded-xl h-9 px-4" onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}>Previous</Button>
+              <Button variant="outline" size="sm" className="rounded-xl h-9 px-4" onClick={() => setPage(p => p + 1)} disabled={page * pageSize >= totalCount}>Next</Button>
+            </div>
+          </div>
+        )}
+
         {/* Mobile Card View */}
         <div className="grid grid-cols-1 gap-3 p-3 md:hidden bg-slate-50/50">
           {isLoading ? (
@@ -1119,6 +1136,19 @@ export function Inventory() {
             })
           )}
         </div>
+        
+        {/* Mobile Pagination Controls */}
+        {totalCount > pageSize && (
+          <div className="flex md:hidden items-center justify-between py-4 px-4 bg-white border-t border-slate-100">
+            <p className="text-xs text-slate-500">
+              {Math.min(page * pageSize, totalCount)} / {totalCount}
+            </p>
+            <div className="flex items-center gap-2">
+              <Button variant="outline" size="sm" className="rounded-lg h-8" onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}>Prev</Button>
+              <Button variant="outline" size="sm" className="rounded-lg h-8" onClick={() => setPage(p => p + 1)} disabled={page * pageSize >= totalCount}>Next</Button>
+            </div>
+          </div>
+        )}
       </motion.div>
 
       {/* Serial Numbers preview rows */}
@@ -1153,6 +1183,7 @@ export function Inventory() {
         <EditProductModal
           product={editProduct}
           onClose={() => setEditProduct(null)}
+          onSuccess={() => { setEditProduct(null); refetch(); }}
           onDelete={() => {
             const p = editProduct;
             requestConfirm(
@@ -1161,9 +1192,10 @@ export function Inventory() {
               "Delete Product",
               async () => {
                 const opId = crud.startOperation("delete", `Deleting "${p.name}"…`);
-                await deleteProduct(p.id);
+                await supabase.from('products').delete().eq('id', p.id);
                 setEditProduct(null);
                 crud.completeOperation(opId, `"${p.name}" deleted`);
+                refetch();
               }
             );
           }}
@@ -1172,12 +1204,12 @@ export function Inventory() {
       
       {/* Add New Product Modal */}
       {isAddOpen && (
-        <AddNewProductModal onClose={() => setIsAddOpen(false)} />
+        <AddNewProductModal onClose={() => setIsAddOpen(false)} onSuccess={() => { setIsAddOpen(false); refetch(); }} />
       )}
 
       {/* Import Products Modal */}
       {isImportOpen && (
-        <ImportProductsModal onClose={() => setIsImportOpen(false)} />
+        <ImportProductsModal onClose={() => setIsImportOpen(false)} onSuccess={() => { setIsImportOpen(false); refetch(); }} />
       )}
       {/* Universal Action Confirm */}
       <Dialog open={!!confirmConfig?.isOpen} onOpenChange={(open) => !open && setConfirmConfig(null)}>
