@@ -278,13 +278,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setPermissions(permissions.filter((p) => p.userId !== id));
     await supabase.from('user_permissions').delete().eq('user_id', id);
     await supabase.from('users').delete().eq('id', id);
-      userEmail: currentUser?.email || "",
-      action: "Deleted",
-      itemName: product.name,
-      changeDetail: `Product "${product.name}" (${product.partNumber}) removed from system`
-    });
-    // Delete from Supabase
-    await supabase.from('products').delete().eq('id', id);
   };
 
   const addAuditLog = async (logData: Omit<AuditLog, "id" | "timestamp">) => {
