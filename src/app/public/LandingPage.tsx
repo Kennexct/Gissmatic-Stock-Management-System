@@ -1,248 +1,247 @@
-import React from 'react';
-import { motion } from 'motion/react';
+import React, { useEffect, useState } from 'react';
+import { motion, useScroll, useTransform } from 'motion/react';
 import { 
-  ArrowRight, ShieldCheck, Zap, Settings, 
-  Wrench, Activity, Clock, MapPin, Phone, Mail, 
-  ChevronRight, Lock
+  Cpu, Power, Activity, ArrowUpRight, 
+  Wrench, Lock
 } from 'lucide-react';
 
 const SERVICES = [
   {
-    icon: Settings,
-    title: "Automation Portfolio",
-    desc: "Comprehensive SIEMENS automation systems from legacy to latest innovative platforms.",
-    color: "from-blue-500 to-cyan-400"
+    id: "01",
+    title: "SIMATIC Automation",
+    subtitle: "S7-300, S7-400, S7-1200, S7-1500",
+    desc: "Complete lifecycle support for Siemens automation platforms. From legacy migration to TIA Portal integration.",
+    icon: Cpu,
   },
   {
-    icon: Activity,
+    id: "02",
+    title: "Industrial Drives & Motors",
+    subtitle: "SINAMICS, Micromaster, SIMOTICS",
+    desc: "Low voltage converters and motor solutions optimized for precision control and energy efficiency.",
+    icon: Power,
+  },
+  {
+    id: "03",
     title: "PROFIBUS / PROFINET",
-    desc: "Best-in-class troubleshooting and maintenance tools from HMS (Atlas, ComBricks, ProfiTrace).",
-    color: "from-emerald-500 to-green-400"
+    subtitle: "Diagnostics & Infrastructure",
+    desc: "Advanced network troubleshooting using ComBricks and ProfiTrace. We eliminate communication blind spots.",
+    icon: Activity,
   },
   {
+    id: "04",
+    title: "Component Level Repair",
+    subtitle: "IPC, HMI, PLC Modules",
+    desc: "Fast-turnaround diagnostic and repair services. Extending the life of obsolete and discontinued parts.",
     icon: Wrench,
-    title: "Expert Repair",
-    desc: "Extensive diagnostic and repair services minimizing your operational downtime.",
-    color: "from-orange-500 to-amber-400"
-  },
-  {
-    icon: Zap,
-    title: "System Upgrade",
-    desc: "Seamless migration and modernization of obsolete industrial control systems.",
-    color: "from-indigo-500 to-blue-500"
   }
 ];
 
-const FEATURES = [
-  { icon: ShieldCheck, title: "Authorized Partner", desc: "Original products from Siemens & HMS with 12 months warranty." },
-  { icon: Clock, title: "20 Years Experience", desc: "In-depth technical consultation and proven market knowledge." },
-  { icon: Zap, title: "Fast Delivery", desc: "Large local stock and express delivery for critical breakdowns." }
-];
-
 export function LandingPage() {
+  const { scrollYProgress } = useScroll();
+  const heroY = useTransform(scrollYProgress, [0, 0.2], [0, 100]);
+  const heroOpacity = useTransform(scrollYProgress, [0, 0.15], [1, 0]);
+
+  const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
+
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      setMousePosition({ x: e.clientX, y: e.clientY });
+    };
+    window.addEventListener("mousemove", handleMouseMove);
+    return () => window.removeEventListener("mousemove", handleMouseMove);
+  }, []);
+
   const navigateToAdmin = () => {
     window.location.hash = "#admin";
     window.location.reload();
   };
 
   return (
-    <div className="min-h-screen bg-[#020617] text-slate-200 selection:bg-[#16c60c] selection:text-white font-sans overflow-x-hidden">
+    <div className="min-h-screen bg-[#050505] text-[#e2e8f0] font-sans selection:bg-[#0099ff] selection:text-white overflow-x-hidden relative">
       
-      {/* ── Navbar ── */}
-      <nav className="fixed top-0 w-full z-50 bg-[#020617]/80 backdrop-blur-md border-b border-white/5">
+      {/* Engineered Grid Background */}
+      <div 
+        className="fixed inset-0 z-0 pointer-events-none opacity-[0.04]"
+        style={{
+          backgroundImage: `
+            linear-gradient(to right, #ffffff 1px, transparent 1px),
+            linear-gradient(to bottom, #ffffff 1px, transparent 1px)
+          `,
+          backgroundSize: '4rem 4rem',
+        }}
+      />
+      
+      {/* Subtle Mouse Follower (Glow) */}
+      <div 
+        className="fixed inset-0 z-0 pointer-events-none transition-opacity duration-300"
+        style={{
+          background: `radial-gradient(600px circle at ${mousePosition.x}px ${mousePosition.y}px, rgba(0, 153, 255, 0.08), transparent 40%)`
+        }}
+      />
+
+      {/* ── Navigation ── */}
+      <nav className="fixed top-0 w-full z-50 bg-[#050505]/90 backdrop-blur-md border-b border-white/10 mix-blend-difference">
         <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-gradient-to-br from-[#0a1565] to-[#1229b3] shadow-lg shadow-blue-900/20">
-              <span className="font-bold text-white text-xl tracking-tighter">G</span>
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 bg-[#0099ff] flex items-center justify-center">
+              <span className="font-bold text-black text-lg tracking-tighter">G</span>
             </div>
-            <span className="font-bold text-xl tracking-tight text-white hidden sm:block">GISSMATIC</span>
+            <span className="font-bold text-xl tracking-widest text-white uppercase">Gissmatic</span>
           </div>
           
-          <div className="hidden md:flex items-center gap-8 text-sm font-medium text-slate-300">
-            <a href="#about" className="hover:text-white transition-colors">About Us</a>
-            <a href="#services" className="hover:text-white transition-colors">Services</a>
-            <a href="#contact" className="hover:text-white transition-colors">Contact</a>
+          <div className="hidden md:flex items-center gap-10 text-xs font-mono tracking-widest text-slate-400">
+            <a href="#portfolio" className="hover:text-[#0099ff] transition-colors">PORTFOLIO</a>
+            <a href="#about" className="hover:text-[#0099ff] transition-colors">EXPERTISE</a>
+            <a href="#contact" className="hover:text-[#0099ff] transition-colors">CONTACT</a>
           </div>
 
           <button 
             onClick={navigateToAdmin}
-            className="group relative px-5 py-2.5 rounded-full bg-white/5 hover:bg-white/10 border border-white/10 transition-all flex items-center gap-2 text-sm font-medium text-white"
+            className="group flex items-center gap-2 text-xs font-mono tracking-widest text-white hover:text-[#0099ff] transition-colors"
           >
-            <Lock className="w-4 h-4 text-slate-400 group-hover:text-white transition-colors" />
-            Staff Portal
+            <Lock className="w-3.5 h-3.5" />
+            <span>PORTAL</span>
           </button>
         </div>
       </nav>
 
       {/* ── Hero Section ── */}
-      <section className="relative pt-32 pb-20 lg:pt-48 lg:pb-32 px-6 overflow-hidden">
-        <div className="absolute inset-0 z-0">
-          <div className="absolute top-1/4 left-1/4 w-[500px] h-[500px] bg-[#1229b3] rounded-full mix-blend-screen filter blur-[120px] opacity-20 animate-pulse" />
-          <div className="absolute bottom-1/4 right-1/4 w-[600px] h-[600px] bg-[#16c60c] rounded-full mix-blend-screen filter blur-[150px] opacity-10" />
-        </div>
-        
-        <div className="relative z-10 max-w-7xl mx-auto text-center">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6 }}
-          >
-            <span className="inline-block py-1.5 px-4 rounded-full bg-white/5 border border-white/10 text-[#16c60c] text-sm font-semibold tracking-wide mb-6">
-              YOUR EXPERT FOR SIMATIC
+      <motion.section 
+        style={{ y: heroY, opacity: heroOpacity }}
+        className="relative min-h-[90vh] flex flex-col justify-center px-6 pt-20 z-10"
+      >
+        <div className="max-w-7xl mx-auto w-full">
+          <div className="flex items-center gap-4 mb-8">
+            <div className="h-[1px] w-12 bg-[#0099ff]"></div>
+            <span className="font-mono text-xs tracking-[0.2em] text-[#0099ff] uppercase">Siemens Solution Partner</span>
+          </div>
+          
+          <h1 className="text-6xl md:text-8xl lg:text-[8rem] font-bold tracking-tighter text-white leading-[0.9] mb-8 uppercase">
+            Engineering<br />
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-white to-slate-500">
+              Continuity.
             </span>
-          </motion.div>
+          </h1>
           
-          <motion.h1 
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.1 }}
-            className="text-5xl md:text-7xl lg:text-8xl font-extrabold tracking-tight text-white mb-8"
-          >
-            Industrial Automation <br className="hidden md:block"/>
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#16c60c] to-emerald-400">
-              Evolved.
-            </span>
-          </motion.h1>
-          
-          <motion.p 
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.2 }}
-            className="mt-4 text-lg md:text-xl text-slate-400 max-w-3xl mx-auto font-light leading-relaxed mb-10"
-          >
-            Focusing on SIEMENS automation and drives from legacy to the latest innovative systems. 
-            Providing best-in-class PROFIBUS & PROFINET troubleshooting tools from HMS.
-          </motion.p>
-          
-          <motion.div 
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.3 }}
-            className="flex flex-col sm:flex-row items-center justify-center gap-4"
-          >
-            <a href="#services" className="px-8 py-4 rounded-full bg-gradient-to-r from-[#0a1565] to-[#1229b3] text-white font-semibold flex items-center gap-2 hover:shadow-lg hover:shadow-blue-900/30 transition-all hover:scale-105 active:scale-95">
-              Explore Portfolio <ArrowRight className="w-5 h-5" />
-            </a>
-            <a href="#contact" className="px-8 py-4 rounded-full bg-white/5 border border-white/10 text-white font-semibold hover:bg-white/10 transition-all">
-              Contact Sales
-            </a>
-          </motion.div>
-        </div>
-      </section>
-
-      {/* ── Features / Why Us ── */}
-      <section id="about" className="py-20 border-y border-white/5 bg-[#0f172a]/50">
-        <div className="max-w-7xl mx-auto px-6">
-          <div className="text-center mb-16">
-            <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">Why Choose Gissmatic</h2>
-            <p className="text-slate-400 max-w-2xl mx-auto">Combining decades of expertise with an authorized global network to deliver unparalleled industrial solutions.</p>
-          </div>
-          
-          <div className="grid md:grid-cols-3 gap-8">
-            {FEATURES.map((feat, idx) => (
-              <motion.div 
-                key={idx}
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ delay: idx * 0.1 }}
-                className="p-8 rounded-3xl bg-white/5 border border-white/5 hover:bg-white/10 transition-all group"
-              >
-                <div className="w-14 h-14 rounded-2xl bg-[#0a1565]/50 border border-blue-500/20 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
-                  <feat.icon className="w-7 h-7 text-[#16c60c]" />
-                </div>
-                <h3 className="text-xl font-bold text-white mb-3">{feat.title}</h3>
-                <p className="text-slate-400 leading-relaxed">{feat.desc}</p>
-              </motion.div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ── Services Grid ── */}
-      <section id="services" className="py-24 px-6 relative">
-        <div className="max-w-7xl mx-auto">
-          <div className="flex flex-col md:flex-row md:items-end justify-between mb-16 gap-6">
-            <div>
-              <h2 className="text-3xl md:text-5xl font-bold text-white mb-4">Products & Services</h2>
-              <p className="text-slate-400 text-lg max-w-xl">Comprehensive lifecycle management for your critical industrial infrastructure.</p>
-            </div>
-            <button className="text-[#16c60c] font-semibold flex items-center gap-1 hover:gap-2 transition-all">
-              View full catalog <ArrowRight className="w-4 h-4" />
-            </button>
-          </div>
-
-          <div className="grid md:grid-cols-2 gap-6">
-            {SERVICES.map((srv, idx) => (
-              <motion.div 
-                key={idx}
-                initial={{ opacity: 0, scale: 0.95 }}
-                whileInView={{ opacity: 1, scale: 1 }}
-                viewport={{ once: true }}
-                transition={{ delay: idx * 0.1 }}
-                className="group relative overflow-hidden rounded-3xl bg-slate-900 border border-white/10 p-8 hover:border-white/20 transition-all cursor-pointer"
-              >
-                <div className="absolute top-0 right-0 p-8 opacity-0 group-hover:opacity-100 group-hover:translate-x-2 transition-all">
-                  <ChevronRight className="w-6 h-6 text-slate-300" />
-                </div>
-                <div className={`w-16 h-16 rounded-2xl bg-gradient-to-br ${srv.color} flex items-center justify-center mb-8 shadow-lg opacity-90 group-hover:opacity-100 transition-opacity`}>
-                  <srv.icon className="w-8 h-8 text-white" />
-                </div>
-                <h3 className="text-2xl font-bold text-white mb-4">{srv.title}</h3>
-                <p className="text-slate-400 text-lg leading-relaxed max-w-md">{srv.desc}</p>
-              </motion.div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ── Footer / Contact ── */}
-      <footer id="contact" className="bg-[#020617] border-t border-white/10 pt-20 pb-10 px-6">
-        <div className="max-w-7xl mx-auto grid md:grid-cols-2 lg:grid-cols-4 gap-12 mb-16">
-          <div className="lg:col-span-2 space-y-6">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-gradient-to-br from-[#0a1565] to-[#1229b3]">
-                <span className="font-bold text-white tracking-tighter">G</span>
+          <div className="grid md:grid-cols-2 gap-12 mt-16">
+            <p className="text-lg md:text-xl text-slate-400 font-light leading-relaxed max-w-xl border-l border-white/10 pl-6">
+              Specialized in legacy SIMATIC systems, drives, and advanced PROFIBUS/PROFINET diagnostics. We eliminate industrial downtime with surgical precision.
+            </p>
+            
+            <div className="flex flex-col justify-end items-start md:items-end gap-4">
+              <a href="#portfolio" className="group flex items-center justify-between w-full md:w-64 px-6 py-4 bg-white text-black font-medium hover:bg-[#0099ff] hover:text-white transition-all duration-300">
+                <span>View Portfolio</span>
+                <ArrowUpRight className="w-5 h-5 group-hover:rotate-45 transition-transform" />
+              </a>
+              <div className="font-mono text-xs text-slate-500 text-left md:text-right uppercase tracking-widest mt-2">
+                System Integration &bull; Procurement &bull; Repair
               </div>
-              <span className="font-bold text-xl tracking-tight text-white">GISSMATIC</span>
             </div>
-            <p className="text-slate-400 max-w-sm">
-              Your trusted expert for SIMATIC systems. Providing comprehensive automation portfolios and troubleshooting solutions.
+          </div>
+        </div>
+      </motion.section>
+
+      {/* ── Expertise Statistics (Ticker style) ── */}
+      <section className="border-y border-white/10 bg-[#0a0a0a] z-20 relative">
+        <div className="max-w-7xl mx-auto px-6 py-12 grid grid-cols-2 md:grid-cols-4 gap-8 divide-x divide-white/5">
+          <div className="pl-0 md:pl-6">
+            <div className="text-4xl font-light text-white mb-2">20<span className="text-[#0099ff]">+</span></div>
+            <div className="font-mono text-xs text-slate-500 tracking-widest uppercase">Years Experience</div>
+          </div>
+          <div className="pl-6 md:pl-8">
+            <div className="text-4xl font-light text-white mb-2">HMS</div>
+            <div className="font-mono text-xs text-slate-500 tracking-widest uppercase">Authorized Partner</div>
+          </div>
+          <div className="pl-6 md:pl-8">
+            <div className="text-4xl font-light text-white mb-2">12<span className="text-[#0099ff]">mo</span></div>
+            <div className="font-mono text-xs text-slate-500 tracking-widest uppercase">Warranty Coverage</div>
+          </div>
+          <div className="pl-6 md:pl-8">
+            <div className="text-4xl font-light text-white mb-2">24/7</div>
+            <div className="font-mono text-xs text-slate-500 tracking-widest uppercase">Express Delivery</div>
+          </div>
+        </div>
+      </section>
+
+      {/* ── Services / Portfolio ── */}
+      <section id="portfolio" className="py-32 px-6 z-10 relative bg-[#050505]">
+        <div className="max-w-7xl mx-auto">
+          <div className="mb-20 flex flex-col md:flex-row md:items-end justify-between gap-8">
+            <div>
+              <h2 className="text-4xl md:text-6xl font-bold text-white tracking-tighter uppercase">Capabilities</h2>
+              <div className="h-[2px] w-24 bg-[#0099ff] mt-6"></div>
+            </div>
+            <p className="text-slate-400 max-w-md text-sm leading-relaxed">
+              From supplying obsolete spare parts to full system migrations. We provide comprehensive lifecycle management for critical infrastructure.
             </p>
           </div>
+
+          <div className="space-y-6">
+            {SERVICES.map((srv, idx) => (
+              <motion.div 
+                key={srv.id}
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true, margin: "-100px" }}
+                transition={{ duration: 0.5, delay: idx * 0.1 }}
+                className="group relative block bg-[#0a0a0a] border border-white/5 hover:border-[#0099ff]/50 transition-colors duration-500"
+              >
+                <div className="flex flex-col md:flex-row md:items-center p-8 md:p-10 gap-8 md:gap-16">
+                  <div className="font-mono text-[#0099ff] text-xl">{srv.id}</div>
+                  
+                  <div className="flex-1">
+                    <h3 className="text-2xl font-bold text-white mb-2 uppercase tracking-wide">{srv.title}</h3>
+                    <div className="font-mono text-xs text-[#0099ff] tracking-widest uppercase mb-4">{srv.subtitle}</div>
+                    <p className="text-slate-400 text-sm max-w-2xl leading-relaxed">{srv.desc}</p>
+                  </div>
+                  
+                  <div className="hidden md:flex w-16 h-16 border border-white/10 group-hover:border-[#0099ff]/50 items-center justify-center transition-colors">
+                    <srv.icon className="w-6 h-6 text-slate-500 group-hover:text-[#0099ff] transition-colors" />
+                  </div>
+                </div>
+              </motion.div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── Footer ── */}
+      <footer id="contact" className="bg-[#020202] pt-24 pb-12 px-6 border-t border-white/10 z-10 relative">
+        <div className="max-w-7xl mx-auto grid md:grid-cols-2 lg:grid-cols-4 gap-16 mb-24">
+          <div className="lg:col-span-2">
+            <h2 className="text-3xl font-bold text-white uppercase tracking-tighter mb-8">GISSMATIC</h2>
+            <p className="text-slate-400 max-w-sm leading-relaxed mb-8">
+              Your trusted partner for SIMATIC automation, component repair, and industrial network diagnostics.
+            </p>
+            <a href="mailto:sales@gissmatic.com" className="inline-flex items-center gap-2 text-xl font-light text-white hover:text-[#0099ff] transition-colors">
+              sales@gissmatic.com
+            </a>
+          </div>
           
           <div>
-            <h4 className="text-white font-semibold mb-6">Contact Us</h4>
-            <ul className="space-y-4">
-              <li className="flex items-start gap-3 text-slate-400">
-                <MapPin className="w-5 h-5 shrink-0 text-[#16c60c]" />
-                <span>26 Sin Ming Lane #03-116<br/>Midview City<br/>Singapore 573971</span>
-              </li>
-              <li className="flex items-center gap-3 text-slate-400">
-                <Phone className="w-5 h-5 shrink-0 text-[#16c60c]" />
-                <span>+65 6732 0848 / 9009 1276</span>
-              </li>
-              <li className="flex items-center gap-3 text-slate-400">
-                <Mail className="w-5 h-5 shrink-0 text-[#16c60c]" />
-                <a href="mailto:sales@gissmatic.com" className="hover:text-white transition-colors">sales@gissmatic.com</a>
-              </li>
+            <h4 className="font-mono text-xs tracking-widest text-[#0099ff] uppercase mb-8">Headquarters</h4>
+            <ul className="space-y-4 text-sm text-slate-400">
+              <li>26 Sin Ming Lane #03-116</li>
+              <li>Midview City</li>
+              <li>Singapore 573971</li>
+              <li className="pt-4 text-white">+65 6732 0848</li>
+              <li className="text-white">+65 9009 1276</li>
             </ul>
           </div>
           
           <div>
-            <h4 className="text-white font-semibold mb-6">Quick Links</h4>
-            <ul className="space-y-3 text-slate-400">
-              <li><a href="#about" className="hover:text-[#16c60c] transition-colors">About Us</a></li>
-              <li><a href="#services" className="hover:text-[#16c60c] transition-colors">Automation Portfolio</a></li>
-              <li><a href="#services" className="hover:text-[#16c60c] transition-colors">Profibus / Profinet</a></li>
-              <li><button onClick={navigateToAdmin} className="hover:text-white flex items-center gap-1.5 transition-colors mt-4"><Lock className="w-3 h-3"/> Staff Portal</button></li>
+            <h4 className="font-mono text-xs tracking-widest text-[#0099ff] uppercase mb-8">System</h4>
+            <ul className="space-y-4 text-sm text-slate-400">
+              <li><button onClick={navigateToAdmin} className="hover:text-white transition-colors flex items-center gap-2"><Lock className="w-3 h-3"/> Staff Login</button></li>
+              <li><a href="#" className="hover:text-white transition-colors">Privacy Policy</a></li>
+              <li><a href="#" className="hover:text-white transition-colors">Terms of Service</a></li>
             </ul>
           </div>
         </div>
         
-        <div className="max-w-7xl mx-auto pt-8 border-t border-white/5 flex flex-col md:flex-row items-center justify-between gap-4 text-sm text-slate-500">
-          <p>© {new Date().getFullYear()} by Gissmatic Automatisierung Pte Ltd.</p>
-          <p>Designed for Performance.</p>
+        <div className="max-w-7xl mx-auto pt-8 border-t border-white/10 flex flex-col md:flex-row items-center justify-between gap-4 font-mono text-xs text-slate-600 uppercase tracking-widest">
+          <p>© {new Date().getFullYear()} Gissmatic Automatisierung Pte Ltd</p>
+          <p>Engineered for Precision</p>
         </div>
       </footer>
     </div>
