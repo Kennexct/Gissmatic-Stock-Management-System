@@ -410,6 +410,13 @@ export function GlobalActionsProvider({ children }: { children: React.ReactNode 
     <QuickActionsContext.Provider value={{ openAddStock, openOutStock, openFreezeStock, openFreezeList }}>
       {children}
 
+      {/* Global Datalist for Part Number Autocomplete */}
+      <datalist id="products-list">
+        {products.map(p => (
+          <option key={p.id} value={p.partNumber}>{p.name} ({p.quantity} in stock)</option>
+        ))}
+      </datalist>
+
       {/* ═══ FAB ═══ */}
       {currentUser && (canAdd || canOut || canFreeze) && (
         <div className="fixed bottom-6 right-5 z-30 flex flex-col items-end gap-2">
@@ -499,13 +506,14 @@ export function GlobalActionsProvider({ children }: { children: React.ReactNode 
           <div className="space-y-4 py-2">
             {/* Part Number */}
             <div className="space-y-1.5">
-              <Label htmlFor="add-pn">Part Number *</Label>
+              <Label htmlFor="add-pn" className="text-base">Part Number / Name *</Label>
               <Input
                 id="add-pn"
-                placeholder="e.g. PN-LAPTOP-HP-001"
+                list="products-list"
+                placeholder="Search by name or scan barcode..."
                 value={addPn}
                 onChange={(e) => handleAddPnChange(e.target.value)}
-                className="rounded-xl font-mono"
+                className="rounded-xl h-12 text-base font-mono bg-slate-50 border-slate-300 focus:bg-white"
               />
             </div>
 
@@ -524,16 +532,16 @@ export function GlobalActionsProvider({ children }: { children: React.ReactNode 
                 {/* SN input */}
                 {addFoundProduct.trackingType === "SN" && (
                   <div className="space-y-2">
-                    <Label>Serial Numbers to Add *</Label>
+                    <Label className="text-base">Scan Serial Numbers *</Label>
                     <div className="flex gap-2">
                       <Input
-                        placeholder="Enter serial number"
+                        placeholder="Scan Barcode Here 🎯"
                         value={addSnInput}
                         onChange={(e) => setAddSnInput(e.target.value)}
                         onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); handleAddSn(); } }}
-                        className="rounded-xl font-mono flex-1"
+                        className="rounded-xl h-12 text-base font-mono flex-1 bg-yellow-50 border-yellow-200 focus:bg-white"
                       />
-                      <Button type="button" variant="outline" className="rounded-xl shrink-0" onClick={handleAddSn}>
+                      <Button type="button" variant="outline" className="rounded-xl shrink-0 h-12 w-12" onClick={handleAddSn}>
                         <Plus className="w-4 h-4" />
                       </Button>
                     </div>
@@ -555,10 +563,10 @@ export function GlobalActionsProvider({ children }: { children: React.ReactNode 
                 {/* QTY input */}
                 {addFoundProduct.trackingType === "QTY" && (
                   <div className="space-y-1.5">
-                    <Label htmlFor="add-qty">Quantity to Add *</Label>
-                    <Input id="add-qty" type="number" min="1" placeholder="Enter quantity" value={addQty} onChange={(e) => setAddQty(e.target.value)} className="rounded-xl" />
+                    <Label htmlFor="add-qty" className="text-base">Quantity to Add *</Label>
+                    <Input id="add-qty" type="number" min="1" placeholder="Enter quantity" value={addQty} onChange={(e) => setAddQty(e.target.value)} className="rounded-xl h-12 text-lg font-bold text-center bg-slate-50 border-slate-300 focus:bg-white" />
                     {addQty && parseInt(addQty) > 0 && (
-                      <p className="text-xs" style={{ color: "#0d6604" }}>New total: {addFoundProduct.quantity + parseInt(addQty)} units</p>
+                      <p className="text-sm font-semibold" style={{ color: "#0d6604" }}>New total: {addFoundProduct.quantity + parseInt(addQty)} units</p>
                     )}
                   </div>
                 )}
@@ -575,14 +583,14 @@ export function GlobalActionsProvider({ children }: { children: React.ReactNode 
           </div>
 
           <DialogFooter>
-            <Button variant="outline" className="rounded-xl" onClick={() => { setIsAddOpen(false); resetAdd(); }}>Cancel</Button>
+            <Button variant="outline" className="rounded-xl h-12 px-6" onClick={() => { setIsAddOpen(false); resetAdd(); }}>Cancel</Button>
             <Button
-              className="rounded-xl text-white"
+              className="rounded-xl h-12 px-8 text-base font-bold text-white w-full sm:w-auto"
               style={{ background: "linear-gradient(135deg, #0a1565, #1229b3)" }}
               disabled={!canDoAddStock()}
               onClick={() => setConfirmAddOpen(true)}
             >
-              <ArrowDownToLine className="w-4 h-4 mr-1.5" />Add Stock
+              <ArrowDownToLine className="w-5 h-5 mr-2" />Add Stock
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -633,8 +641,8 @@ export function GlobalActionsProvider({ children }: { children: React.ReactNode 
 
           <div className="space-y-4 py-2">
             <div className="space-y-1.5">
-              <Label htmlFor="out-pn">Part Number *</Label>
-              <Input id="out-pn" placeholder="e.g. PN-LAPTOP-HP-001" value={outPn} onChange={(e) => handleOutPnChange(e.target.value)} className="rounded-xl font-mono" />
+              <Label htmlFor="out-pn" className="text-base">Part Number / Name *</Label>
+              <Input id="out-pn" list="products-list" placeholder="Search by name or scan barcode..." value={outPn} onChange={(e) => handleOutPnChange(e.target.value)} className="rounded-xl h-12 text-base font-mono bg-slate-50 border-slate-300 focus:bg-white" />
             </div>
 
             {outPn.trim().length > 3 && !outFoundProduct && (
@@ -649,23 +657,23 @@ export function GlobalActionsProvider({ children }: { children: React.ReactNode 
 
                 {outFoundProduct.trackingType === "SN" && (
                   <div className="space-y-2">
-                    <Label>Scan Serial Numbers *</Label>
+                    <Label className="text-base">Scan Serial Numbers *</Label>
                     {outFoundProduct.serialNumbers.length === 0 ? (
-                      <p className="text-sm text-red-500">No serial numbers available in inventory.</p>
+                      <p className="text-sm text-red-500 font-semibold">No serial numbers available in inventory.</p>
                     ) : (
                       <>
                         <div className="flex gap-2">
                           <div className="relative flex-1">
-                            <ScanLine className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                            <ScanLine className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400" />
                             <Input
-                              placeholder="Scan or type serial number…"
+                              placeholder="Scan Barcode Here 🎯"
                               value={outSnInput}
                               onChange={(e) => setOutSnInput(e.target.value)}
                               onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); handleOutSnScan(); } }}
-                              className="rounded-xl font-mono pl-9"
+                              className="rounded-xl h-12 text-base font-mono pl-12 bg-yellow-50 border-yellow-200 focus:bg-white"
                             />
                           </div>
-                          <Button type="button" variant="outline" className="rounded-xl shrink-0" onClick={handleOutSnScan}>
+                          <Button type="button" variant="outline" className="rounded-xl shrink-0 h-12 w-12" onClick={handleOutSnScan}>
                             <Plus className="w-4 h-4" />
                           </Button>
                         </div>
@@ -692,13 +700,13 @@ export function GlobalActionsProvider({ children }: { children: React.ReactNode 
 
                 {outFoundProduct.trackingType === "QTY" && (
                   <div className="space-y-1.5">
-                    <Label htmlFor="out-qty">Quantity to Remove *</Label>
-                    <Input id="out-qty" type="number" min="1" max={outFoundProduct.quantity} placeholder="Enter quantity" value={outQty} onChange={(e) => setOutQty(e.target.value)} className="rounded-xl" />
+                    <Label htmlFor="out-qty" className="text-base">Quantity to Remove *</Label>
+                    <Input id="out-qty" type="number" min="1" max={outFoundProduct.quantity} placeholder="Enter quantity" value={outQty} onChange={(e) => setOutQty(e.target.value)} className="rounded-xl h-12 text-lg font-bold text-center bg-slate-50 border-slate-300 focus:bg-white" />
                     {outQty && parseInt(outQty) > 0 && parseInt(outQty) <= outFoundProduct.quantity && (
-                      <p className="text-xs" style={{ color: "#e05a00" }}>Remaining after out: {outFoundProduct.quantity - parseInt(outQty)} units</p>
+                      <p className="text-sm font-semibold" style={{ color: "#e05a00" }}>Remaining after out: {outFoundProduct.quantity - parseInt(outQty)} units</p>
                     )}
                     {outQty && parseInt(outQty) > outFoundProduct.quantity && (
-                      <p className="text-xs text-red-500">Exceeds available stock ({outFoundProduct.quantity})</p>
+                      <p className="text-sm font-bold text-red-500">Exceeds available stock ({outFoundProduct.quantity})</p>
                     )}
                   </div>
                 )}
@@ -726,12 +734,12 @@ export function GlobalActionsProvider({ children }: { children: React.ReactNode 
             )}
           </div>
 
-          <DialogFooter className="flex-wrap gap-2">
-            <Button variant="outline" className="rounded-xl" onClick={() => { setIsOutOpen(false); resetOut(); }}>Cancel</Button>
+          <DialogFooter className="flex-wrap gap-3 mt-4">
+            <Button variant="outline" className="rounded-xl h-12 px-6" onClick={() => { setIsOutOpen(false); resetOut(); }}>Cancel</Button>
             {outFoundProduct && canFreeze && (
               <Button
                 variant="outline"
-                className="rounded-xl gap-1.5"
+                className="rounded-xl h-12 px-6 gap-2"
                 style={{ borderColor: "#0ea5e9", color: "#0369a1" }}
                 disabled={!canDoOutStock()}
                 onClick={() => {
@@ -747,16 +755,16 @@ export function GlobalActionsProvider({ children }: { children: React.ReactNode 
                   setConfirmFreezeOpen(true);
                 }}
               >
-                <Snowflake className="w-4 h-4" />Freeze Stock
+                <Snowflake className="w-5 h-5" />Freeze Stock
               </Button>
             )}
             <Button
-              className="rounded-xl text-white font-semibold"
+              className="rounded-xl h-12 px-8 text-base font-bold text-white w-full sm:w-auto"
               style={{ background: "linear-gradient(135deg, #16c60c, #0d9904)" }}
               disabled={!canDoOutStock()}
               onClick={() => setConfirmOutOpen(true)}
             >
-              <ArrowUpFromLine className="w-4 h-4 mr-1.5" />Confirm Out Stock
+              <ArrowUpFromLine className="w-5 h-5 mr-2" />Confirm Out Stock
             </Button>
           </DialogFooter>
         </DialogContent>
