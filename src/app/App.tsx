@@ -11,6 +11,7 @@ import { Suppliers } from "./components/suppliers";
 import { Reports } from "./components/reports";
 import { Customers } from "./components/customers";
 import { Toaster } from "sonner";
+import { LandingPage } from "./public/LandingPage";
 
 // ── Error Boundary ──────────────────────────────────────────────────
 // Catches runtime errors in any child component and shows a recovery UI
@@ -128,6 +129,20 @@ function AppContent() {
 }
 
 export default function App() {
+  const [currentHash, setCurrentHash] = useState(window.location.hash);
+
+  React.useEffect(() => {
+    const handleHashChange = () => setCurrentHash(window.location.hash);
+    window.addEventListener("hashchange", handleHashChange);
+    return () => window.removeEventListener("hashchange", handleHashChange);
+  }, []);
+
+  const isAdminRoute = currentHash === "#admin";
+
+  if (!isAdminRoute) {
+    return <LandingPage />;
+  }
+
   return (
     <ErrorBoundary>
       <CrudProgressProvider>
