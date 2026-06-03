@@ -329,12 +329,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const { error: dbError } = await supabase.from('users').update({ name, email }).eq('id', currentUser.id);
     if (dbError) return { success: false, error: dbError.message };
     
-    // FORCE Update Supabase Auth every time without checking the previous state.
-    // This un-sticks any credentials that fell out of sync.
-    const { error: authError } = await supabase.auth.updateUser({ email });
-    if (authError) {
-      console.error("Auth Update Error:", authError);
-      return { success: false, error: authError.message };
+    // Only update Supabase Auth if the email actually changed.
+    // This prevents hitting the "email rate limit exceeded" error when just updating the name.
+    if (email !== currentUser.email) {
+      const { error: authError } = await supabase.auth.updateUser({ email });
+      if (authError) {
+        console.error("Auth Update Error:", authError);
+        return { success: false, error: authError.message };
+      }
     }
     
     return { success: true };
