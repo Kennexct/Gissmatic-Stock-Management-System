@@ -72,7 +72,7 @@ function StatDetailModal({
 }
 
 export function Dashboard({ onNavigate }: DashboardProps) {
-  const { auditLogs, outgoingSales, frozenStocks, currentUser, getUserPermissions } = useAuth();
+  const { auditLogs, outgoingSales, frozenStocks, currentUser, getUserPermissions, customers, suppliers, categories } = useAuth();
   const quickActions = useQuickActions();
   const { totalParts, outOfStock, totalUnits, categoryData, lowStockProducts, isLoading: statsLoading } = useDashboardStats();
 
@@ -203,7 +203,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5, staggerChildren: 0.1 }}
       >
-        {isLoading ? (
+        {statsLoading ? (
           Array.from({ length: 4 }).map((_, i) => (
             <div key={i} className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm space-y-3">
               <div className="flex justify-between items-start">
@@ -474,24 +474,22 @@ export function Dashboard({ onNavigate }: DashboardProps) {
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {Array.from(new Set(products.map((p) => p.category))).map((cat) => {
-              const items = products.filter((p) => p.category === cat);
-              const pct = Math.round((items.length / products.length) * 100);
-              const total = items.reduce((acc, p) => acc + p.quantity, 0);
+            {categoryData.map((cat) => {
+              const pct = Math.round((cat.value / totalParts) * 100) || 0;
               return (
                 <button
-                  key={cat}
+                  key={cat.name}
                   onClick={() => onNavigate?.("inventory")}
                   className="bg-[#f8fbff] rounded-xl p-4 border border-slate-100 text-left hover:border-[#c7d5ff] hover:shadow-sm transition-all"
                 >
                   <div className="flex items-center justify-between mb-2">
-                    <span className="text-sm font-medium text-slate-700">{cat}</span>
-                    <span className="text-xs text-slate-400">{items.length} part{items.length !== 1 ? "s" : ""}</span>
+                    <span className="text-sm font-medium text-slate-700">{cat.name}</span>
+                    <span className="text-xs text-slate-400">{cat.value} part{cat.value !== 1 ? "s" : ""}</span>
                   </div>
                   <div className="w-full bg-slate-200 rounded-full h-1.5 mb-2">
                     <div className="h-1.5 rounded-full" style={{ width: `${pct}%`, background: "linear-gradient(90deg, #0a1565, #16c60c)" }} />
                   </div>
-                  <p className="text-xs text-slate-400">{total.toLocaleString()} units · {pct}%</p>
+                  <p className="text-xs text-slate-400">{pct}%</p>
                 </button>
               );
             })}
