@@ -41,7 +41,7 @@ export function useProducts(options: UseProductsOptions) {
       const from = (page - 1) * pageSize;
       const to = from + pageSize - 1;
       
-      query = query.order('created_at', { ascending: false }).range(from, to);
+      query = query.order('id', { ascending: false }).range(from, to);
 
       const { data, count, error: fetchError } = await query;
 
