@@ -90,7 +90,7 @@ export function ConfirmDialog({ open, onClose, onConfirm, title, description, co
 // ─── Provider ────────────────────────────────────────────────────
 export function GlobalActionsProvider({ children }: { children: React.ReactNode }) {
   const {
-    products, suppliers, customers, categories,
+    suppliers, customers, categories,
     addProduct, addAuditLog, addSupplier, addCustomer, addOutgoingSale,
     addFrozenStock, releaseFrozenStock, frozenStocks,
     currentUser, addCategory, getUserPermissions,

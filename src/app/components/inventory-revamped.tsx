@@ -61,7 +61,7 @@ function AddNewProductModal({ onClose, onSuccess }: { onClose: () => void, onSuc
     setAddSnInput("");
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!form.name || !form.pn || !form.category) {
       toast.error("Please fill in all required product details"); return;
     }
@@ -73,7 +73,8 @@ function AddNewProductModal({ onClose, onSuccess }: { onClose: () => void, onSuc
     if (trackingType === "QTY" && (!addQty || parseInt(addQty) <= 0)) {
       toast.error("Enter a valid quantity"); return;
     }
-    if (products.find((p) => p.partNumber.toLowerCase() === form.pn.trim().toLowerCase())) {
+    const { data: existing } = await supabase.from('products').select('id').ilike('part_number', form.pn.trim()).single();
+    if (existing) {
       toast.error("Part number already exists in inventory"); return;
     }
 
@@ -744,10 +745,10 @@ export function Inventory() {
     searchQuery
   });
 
-  const totalStock = products.reduce((a, p) => a + p.quantity, 0);
+  const totalStock = filteredProducts.reduce((a, p) => a + p.quantity, 0);
 
   const exportToExcel = () => {
-    const data = products.map(p => ({
+    const data = filteredProducts.map(p => ({
       "Part Number": p.partNumber,
       "Product Name": p.name,
       "Category": p.category,
@@ -771,9 +772,9 @@ export function Inventory() {
     doc.setFontSize(11);
     doc.setTextColor(100);
     doc.text(`Generated on: ${new Date().toLocaleString()}`, 14, 30);
-    doc.text(`Total Items: ${products.length} | Total Units: ${totalStock}`, 14, 36);
+    doc.text(`Total Items: ${totalCount} | Total Units: ${totalStock}`, 14, 36);
 
-    const tableData = products.map(p => [
+    const tableData = filteredProducts.map(p => [
       p.partNumber,
       p.name,
       p.category,
@@ -799,7 +800,7 @@ export function Inventory() {
         <div>
           <h1 style={{ color: "#0a1565" }}>Inventory</h1>
           <p className="text-slate-500 text-sm mt-0.5">
-            {products.length} part{products.length !== 1 ? "s" : ""} · {totalStock.toLocaleString()} total units
+            {totalCount} part{totalCount !== 1 ? "s" : ""} · {totalStock.toLocaleString()} total units
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -914,9 +915,9 @@ export function Inventory() {
             <TableRow className="hover:bg-transparent border-b border-slate-100" style={{ background: "#f8fbff" }}>
               <TableHead className="w-12 text-center">
                 <Checkbox 
-                  checked={selectedIds.length === products.length && products.length > 0} 
+                  checked={selectedIds.length === filteredProducts.length && filteredProducts.length > 0} 
                   onCheckedChange={(checked) => {
-                    setSelectedIds(checked ? products.map(p => p.id) : []);
+                    setSelectedIds(checked ? filteredProducts.map(p => p.id) : []);
                   }}
                   className="rounded-md border-slate-300"
                 />

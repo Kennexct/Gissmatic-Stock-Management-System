@@ -11,6 +11,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "./ui/select";
 import { useAuth } from "./auth-context";
+import { supabase } from "../../lib/supabase";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import * as XLSX from "xlsx";
@@ -19,7 +20,17 @@ import {
 } from "recharts";
 
 export function Reports() {
-  const { auditLogs, products } = useAuth();
+  const { auditLogs } = useAuth();
+  const [products, setProducts] = useState<any[]>([]);
+  React.useEffect(() => {
+    supabase.from('products').select('*').then(({ data }) => {
+      if (data) {
+        setProducts(data.map((db: any) => ({
+          id: db.id, partNumber: db.part_number, name: db.name, trackingType: db.tracking_type, quantity: db.quantity, serialNumbers: db.serial_numbers || [], category: db.category, supplierName: db.supplier_name, lastUpdated: db.last_updated
+        })));
+      }
+    });
+  }, []);
   const [searchQuery, setSearchQuery] = useState("");
   const [actionFilter, setActionFilter] = useState("all");
   const [dateRange, setDateRange] = useState("all");
