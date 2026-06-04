@@ -84,9 +84,9 @@ export function LandingPage() {
         <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-8 h-8 bg-[#0099ff] flex items-center justify-center">
-              <span className="font-bold text-black text-lg tracking-tighter">G</span>
+              <span className="font-bold text-black text-lg tracking-tighter">E</span>
             </div>
-            <span className="font-bold text-xl tracking-widest text-white uppercase">Gissmatic</span>
+            <span className="font-bold text-xl tracking-widest text-white uppercase">Enterprise</span>
           </div>
           
           <div className="hidden md:flex items-center gap-10 text-xs font-mono tracking-widest text-slate-400">
@@ -209,12 +209,12 @@ export function LandingPage() {
       <footer id="contact" className="bg-[#020202] pt-24 pb-12 px-6 border-t border-white/10 z-10 relative">
         <div className="max-w-7xl mx-auto grid md:grid-cols-2 lg:grid-cols-4 gap-16 mb-24">
           <div className="lg:col-span-2">
-            <h2 className="text-3xl font-bold text-white uppercase tracking-tighter mb-8">GISSMATIC</h2>
+            <h2 className="text-3xl font-bold text-white uppercase tracking-tighter mb-8">ENTERPRISE</h2>
             <p className="text-slate-400 max-w-sm leading-relaxed mb-8">
               Your trusted partner for SIMATIC automation, component repair, and industrial network diagnostics.
             </p>
-            <a href="mailto:sales@gissmatic.com" className="inline-flex items-center gap-2 text-xl font-light text-white hover:text-[#0099ff] transition-colors">
-              sales@gissmatic.com
+            <a href="mailto:sales@enterprise.com" className="inline-flex items-center gap-2 text-xl font-light text-white hover:text-[#0099ff] transition-colors">
+              sales@enterprise.com
             </a>
           </div>
           
@@ -240,7 +240,7 @@ export function LandingPage() {
         </div>
         
         <div className="max-w-7xl mx-auto pt-8 border-t border-white/10 flex flex-col md:flex-row items-center justify-between gap-4 font-mono text-xs text-slate-600 uppercase tracking-widest">
-          <p>© {new Date().getFullYear()} Gissmatic Automatisierung Pte Ltd</p>
+          <p>© {new Date().getFullYear()} Enterprise Management Pte Ltd</p>
           <p>Engineered for Precision</p>
         </div>
       </footer>

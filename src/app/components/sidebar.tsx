@@ -6,7 +6,7 @@ import {
 import { useAuth } from "./auth-context";
 import { cn } from "../../lib/utils";
 
-const logoImage = "/logo.png";
+const logoImage = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='1' height='1'%3E%3C/svg%3E";
 
 interface SidebarProps {
   currentPage: string;
@@ -78,12 +78,12 @@ export function Sidebar({ currentPage, onNavigate, isOpen, onToggle, isMinimized
           <div className="flex items-center justify-between">
             <div className={cn("flex items-center gap-2.5", isMinimized && "lg:justify-center lg:w-full")}>
               <div className="w-9 h-9 rounded-xl overflow-hidden shrink-0 border border-white/10">
-                <img src={logoImage} alt="GISSMATIC" className="w-full h-full object-cover" />
+                <img src={logoImage} alt="ENTERPRISE" className="w-full h-full object-cover" />
               </div>
               {!isMinimized && (
                 <div>
-                  <p className="text-white font-semibold tracking-wide text-sm">GISSMATIC</p>
-                  <p className="text-[#16c60c]/70 text-xs">Automatisierung</p>
+                  <p className="text-white font-semibold tracking-wide text-sm">ENTERPRISE</p>
+                  <p className="text-[#16c60c]/70 text-xs">Management</p>
                 </div>
               )}
             </div>
