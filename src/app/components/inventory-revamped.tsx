@@ -382,19 +382,33 @@ function EditProductModal({ product, onClose, onDelete, onSuccess }: { product: 
           </div>
 
           {/* Tracking info (read-only) */}
-          <div className="rounded-xl p-3 border border-slate-100 bg-slate-50/60 flex items-center justify-between">
-            <div>
-              <p className="text-xs text-slate-400">Tracking Type</p>
-              <p className="text-sm font-medium text-slate-700">
-                {product.trackingType === "SN" ? "Serial Number" : "Quantity"}
-              </p>
+          <div className="space-y-2">
+            <div className="rounded-xl p-3 border border-slate-100 bg-slate-50/60 flex items-center justify-between">
+              <div>
+                <p className="text-xs text-slate-400">Tracking Type</p>
+                <p className="text-sm font-medium text-slate-700">
+                  {product.trackingType === "SN" ? "Serial Number" : "Quantity"}
+                </p>
+              </div>
+              <div className="text-right">
+                <p className="text-xs text-slate-400">Current Stock</p>
+                <p className="text-sm font-semibold" style={{ color: "#0a1565" }}>
+                  {product.trackingType === "SN" ? `${product.serialNumbers.length} SNs` : `${product.quantity} units`}
+                </p>
+              </div>
             </div>
-            <div className="text-right">
-              <p className="text-xs text-slate-400">Current Stock</p>
-              <p className="text-sm font-semibold" style={{ color: "#0a1565" }}>
-                {product.trackingType === "SN" ? `${product.serialNumbers.length} SNs` : `${product.quantity} units`}
-              </p>
-            </div>
+            {product.trackingType === "SN" && product.serialNumbers.length > 0 && (
+              <div className="rounded-xl p-3 border border-slate-100 bg-slate-50/60">
+                <p className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">Available Serial Numbers</p>
+                <div className="flex flex-wrap gap-1.5 max-h-32 overflow-y-auto pr-1">
+                  {product.serialNumbers.map((sn, idx) => (
+                    <span key={idx} className="inline-flex items-center px-2 py-0.5 rounded text-xs font-mono bg-white border border-slate-200 text-[#0a1565] shadow-sm">
+                      {sn}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Product Log toggle */}
