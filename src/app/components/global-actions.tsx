@@ -766,12 +766,12 @@ export function GlobalActionsProvider({ children }: { children: React.ReactNode 
             )}
           </div>
 
-          <DialogFooter className="flex-wrap gap-3 mt-4">
-            <Button variant="outline" className="rounded-xl h-12 px-6" onClick={() => { setIsOutOpen(false); resetOut(); }}>Cancel</Button>
+          <DialogFooter className="sm:space-x-0 gap-2 sm:gap-3 mt-4">
+            <Button variant="outline" className="rounded-xl h-12 px-6 w-full sm:w-auto" onClick={() => { setIsOutOpen(false); resetOut(); }}>Cancel</Button>
             {outFoundProduct && canFreeze && (
               <Button
                 variant="outline"
-                className="rounded-xl h-12 px-6 gap-2"
+                className="rounded-xl h-12 px-6 gap-2 w-full sm:w-auto"
                 style={{ borderColor: "#0ea5e9", color: "#0369a1" }}
                 disabled={!canDoOutStock()}
                 onClick={() => {
