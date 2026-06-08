@@ -119,7 +119,7 @@ function AppContent() {
           onToggleMinimize={() => setIsSidebarMinimized(!isSidebarMinimized)}
         />
         <main className="flex-1 min-w-0 min-h-screen max-w-full flex flex-col">
-          <div className="p-4 sm:p-5 lg:p-8 w-full max-w-7xl mx-auto pt-20 lg:pt-8 flex-1">
+          <div className="p-4 sm:p-5 lg:p-8 w-full max-w-7xl mx-auto flex-1">
             {renderPage()}
           </div>
         </main>

@@ -809,9 +809,9 @@ export function Inventory() {
   };
 
   return (
-    <div className="space-y-6 pt-14 lg:pt-0">
+    <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="sticky top-0 z-20 bg-[#f0f5ff]/90 backdrop-blur-md -mx-4 px-4 sm:-mx-5 sm:px-5 lg:-mx-8 lg:px-8 pt-20 lg:pt-8 pb-4 -mt-4 sm:-mt-5 lg:-mt-8 mb-4 border-b border-slate-200/50 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 style={{ color: "#0a1565" }}>Inventory</h1>
           <p className="text-slate-500 text-sm mt-0.5">

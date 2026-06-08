@@ -396,8 +396,9 @@ export function Settings() {
   }
 
   return (
-    <div className="space-y-6 pt-14 lg:pt-0">
-      <div>
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="sticky top-0 z-20 bg-[#f0f5ff]/90 backdrop-blur-md -mx-4 px-4 sm:-mx-5 sm:px-5 lg:-mx-8 lg:px-8 pt-20 lg:pt-8 pb-4 -mt-4 sm:-mt-5 lg:-mt-8 mb-4 border-b border-slate-200/50">
         <h1 className="flex items-center gap-2" style={{ color: "#0a1565" }}>
           <SettingsIcon className="h-7 w-7" style={{ color: "#16c60c" }} />
           Settings
