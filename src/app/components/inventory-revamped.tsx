@@ -738,6 +738,7 @@ export function Inventory() {
   
   const [page, setPage] = useState(1);
   const pageSize = 50;
+  const [expandedRowId, setExpandedRowId] = useState<string | null>(null);
 
   const { products: filteredProducts, totalCount, isLoading, refetch } = useProducts({
     page,
@@ -967,7 +968,8 @@ export function Inventory() {
               filteredProducts.map((product) => {
                 const isOutOfStock = product.quantity === 0;
                 return (
-                  <TableRow key={product.id} className="border-b border-slate-50 hover:bg-[#f8fbff] transition-colors">
+                  <React.Fragment key={product.id}>
+                  <TableRow className="border-b border-slate-50 hover:bg-[#f8fbff] transition-colors">
                     <TableCell className="w-12 text-center">
                       <Checkbox 
                         checked={selectedIds.includes(product.id)}
@@ -1020,9 +1022,20 @@ export function Inventory() {
                       </span>
                     </TableCell>
                     <TableCell className="text-right">
-                      <span className="font-semibold" style={{ color: isOutOfStock ? "#dc2626" : "#0a1565" }}>
-                        {product.trackingType === "SN" ? `${product.serialNumbers.length} SN` : product.quantity}
-                      </span>
+                      {product.trackingType === "SN" ? (
+                        <button
+                          onClick={() => setExpandedRowId(expandedRowId === product.id ? null : product.id)}
+                          className="inline-flex items-center justify-end w-full gap-1.5 font-semibold cursor-pointer hover:opacity-80 transition-opacity"
+                          style={{ color: isOutOfStock ? "#dc2626" : "#0a1565" }}
+                        >
+                          {product.serialNumbers.length} SN
+                          {expandedRowId === product.id ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                        </button>
+                      ) : (
+                        <span className="font-semibold" style={{ color: isOutOfStock ? "#dc2626" : "#0a1565" }}>
+                          {product.quantity}
+                        </span>
+                      )}
                     </TableCell>
                     <TableCell>
                       {isOutOfStock ? (
@@ -1046,6 +1059,31 @@ export function Inventory() {
                       </button>
                     </TableCell>
                   </TableRow>
+                  {expandedRowId === product.id && product.trackingType === "SN" && (
+                    <TableRow className="bg-slate-50/50 hover:bg-slate-50/50">
+                      <TableCell colSpan={9} className="p-0 border-b border-slate-100">
+                        <motion.div 
+                          initial={{ height: 0, opacity: 0 }}
+                          animate={{ height: "auto", opacity: 1 }}
+                          className="px-6 py-4 pl-[72px]"
+                        >
+                          <p className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-3">Serial Numbers in Stock ({product.serialNumbers.length})</p>
+                          {product.serialNumbers.length === 0 ? (
+                            <p className="text-sm text-slate-400 italic">No serial numbers available.</p>
+                          ) : (
+                            <div className="flex flex-wrap gap-2">
+                              {product.serialNumbers.map((sn, idx) => (
+                                <span key={idx} className="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-mono shadow-sm border" style={{ background: "#ffffff", color: "#0a1565", borderColor: "#e2e8f0" }}>
+                                  {sn}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                        </motion.div>
+                      </TableCell>
+                    </TableRow>
+                  )}
+                  </React.Fragment>
                 );
               })
             )}
@@ -1120,18 +1158,51 @@ export function Inventory() {
                     </div>
                     <div className="bg-slate-50 p-2 rounded-lg">
                       <p className="text-[10px] uppercase font-bold text-slate-400 mb-0.5">Stock</p>
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-xs font-bold" style={{ color: isOutOfStock ? "#dc2626" : "#0a1565" }}>
-                          {product.trackingType === "SN" ? `${product.serialNumbers.length} SN` : product.quantity}
-                        </span>
-                        {isOutOfStock ? (
-                          <span className="w-2 h-2 rounded-full bg-red-500"></span>
-                        ) : (
-                          <span className="w-2 h-2 rounded-full bg-green-500"></span>
-                        )}
+                      <div className="flex items-center justify-between gap-1.5">
+                        <div className="flex items-center gap-1.5">
+                          {product.trackingType === "SN" ? (
+                            <button
+                              onClick={() => setExpandedRowId(expandedRowId === product.id ? null : product.id)}
+                              className="text-xs font-bold inline-flex items-center gap-1 hover:opacity-80"
+                              style={{ color: isOutOfStock ? "#dc2626" : "#0a1565" }}
+                            >
+                              {product.serialNumbers.length} SN
+                              {expandedRowId === product.id ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                            </button>
+                          ) : (
+                            <span className="text-xs font-bold" style={{ color: isOutOfStock ? "#dc2626" : "#0a1565" }}>
+                              {product.quantity}
+                            </span>
+                          )}
+                          {isOutOfStock ? (
+                            <span className="w-2 h-2 rounded-full bg-red-500"></span>
+                          ) : (
+                            <span className="w-2 h-2 rounded-full bg-green-500"></span>
+                          )}
+                        </div>
                       </div>
                     </div>
                   </div>
+                  {expandedRowId === product.id && product.trackingType === "SN" && (
+                    <motion.div 
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: "auto", opacity: 1 }}
+                      className="mt-1 bg-slate-50 rounded-lg p-3 border border-slate-100"
+                    >
+                      <p className="text-[10px] uppercase font-bold text-slate-500 mb-2">Serial Numbers ({product.serialNumbers.length})</p>
+                      {product.serialNumbers.length === 0 ? (
+                        <p className="text-xs text-slate-400 italic">No serial numbers available.</p>
+                      ) : (
+                        <div className="flex flex-wrap gap-1.5">
+                          {product.serialNumbers.map((sn, idx) => (
+                            <span key={idx} className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-mono shadow-sm border bg-white text-[#0a1565] border-slate-200">
+                              {sn}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </motion.div>
+                  )}
                 </div>
               );
             })
