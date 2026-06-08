@@ -655,7 +655,7 @@ export function GlobalActionsProvider({ children }: { children: React.ReactNode 
       {/* ═══ OUT STOCK MODAL ═══ */}
       <Dialog open={isOutOpen} onOpenChange={handleOutCloseAttempt}>
         <DialogContent 
-          className="max-w-lg max-h-[90vh] overflow-y-auto rounded-2xl"
+          className="max-w-lg sm:max-w-[540px] max-h-[90vh] overflow-y-auto rounded-2xl"
           onPointerDownOutside={(e) => { if (isOutDirty) e.preventDefault(); }}
           onEscapeKeyDown={(e) => { if (isOutDirty) e.preventDefault(); }}
         >
