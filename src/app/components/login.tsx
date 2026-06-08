@@ -7,7 +7,7 @@ import { useAuth } from "./auth-context";
 import { toast } from "sonner";
 import { supabase } from "../../lib/supabase";
 
-const logoImage = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='1' height='1'%3E%3C/svg%3E";
+const logoImage = "/logo.png";
 
 export function Login() {
   const [email, setEmail] = useState("");
@@ -78,7 +78,7 @@ export function Login() {
 
         {/* Logo */}
         <div className="relative z-10">
-          <img src={logoImage} alt="Enterprise Management" className="h-16 w-auto object-contain" />
+          <img src={logoImage} alt="GISSMATIC Automatisierung" className="h-16 w-auto object-contain" />
         </div>
 
         {/* Center content */}
@@ -108,7 +108,7 @@ export function Login() {
           </div>
         </div>
 
-        <p className="relative z-10 text-white/30 text-sm">© 2026 Enterprise Management</p>
+        <p className="relative z-10 text-white/30 text-sm">© 2026 GISSMATIC Automatisierung</p>
       </div>
 
       {/* Right login panel */}
@@ -117,11 +117,11 @@ export function Login() {
           {/* Mobile logo */}
           <div className="flex items-center gap-3 lg:hidden">
             <div className="w-10 h-10 rounded-xl overflow-hidden">
-              <img src={logoImage} alt="ENTERPRISE" className="w-full h-full object-cover" />
+              <img src={logoImage} alt="GISSMATIC" className="w-full h-full object-cover" />
             </div>
             <div>
-              <p className="font-semibold text-[#0a1565]">ENTERPRISE</p>
-              <p className="text-slate-400 text-xs">Management</p>
+              <p className="font-semibold text-[#0a1565]">GISSMATIC</p>
+              <p className="text-slate-400 text-xs">Automatisierung</p>
             </div>
           </div>
 

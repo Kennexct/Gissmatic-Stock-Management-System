@@ -164,13 +164,13 @@ export function Reports() {
         doc.addImage(imgData, "PNG", 14, 6, 20, 20);
         doc.setTextColor(255, 255, 255);
         doc.setFontSize(16);
-        doc.text("ENTERPRISE — Stock Movement Report", 40, 18);
+        doc.text("GISSMATIC — Stock Movement Report", 40, 18);
         doc.setFontSize(9);
         doc.text(`Generated: ${new Date().toLocaleString()}`, 40, 26);
       } else {
         doc.setTextColor(255, 255, 255);
         doc.setFontSize(16);
-        doc.text("ENTERPRISE — Stock Movement Report", 14, 15);
+        doc.text("GISSMATIC — Stock Movement Report", 14, 15);
         doc.setFontSize(9);
         doc.text(`Generated: ${new Date().toLocaleString()}`, 14, 26);
       }
@@ -195,7 +195,7 @@ export function Reports() {
         styles: { fontSize: 7.5, cellPadding: 2 },
         columnStyles: { 0: { cellWidth: 22 }, 4: { fontStyle: "bold" } },
       });
-      doc.save(`enterprise-movements-${Date.now()}.pdf`);
+      doc.save(`gissmatic-movements-${Date.now()}.pdf`);
     };
 
     img.onload = () => generatePdf(img);
@@ -210,7 +210,7 @@ export function Reports() {
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(data), "Stock Movements");
     const summary = [
-      ["ENTERPRISE Stock Movement Report"], [""],
+      ["GISSMATIC Stock Movement Report"], [""],
       ["Metric", "Value"],
       ["Total Parts", products.length],
       ["Stock-In Events", stockInEvents.length],
@@ -220,7 +220,7 @@ export function Reports() {
       ["Report Generated", new Date().toLocaleString()],
     ];
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(summary), "Summary");
-    XLSX.writeFile(wb, `enterprise-report-${Date.now()}.xlsx`);
+    XLSX.writeFile(wb, `gissmatic-report-${Date.now()}.xlsx`);
   };
 
   return (

@@ -768,7 +768,7 @@ export function Inventory() {
     const doc = new jsPDF();
     doc.setFontSize(18);
     doc.setTextColor(10, 21, 101); // #0a1565
-    doc.text("Enterprise Inventory Report", 14, 22);
+    doc.text("Gissmatic Inventory Report", 14, 22);
     doc.setFontSize(11);
     doc.setTextColor(100);
     doc.text(`Generated on: ${new Date().toLocaleString()}`, 14, 30);
